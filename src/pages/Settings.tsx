@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
@@ -19,9 +20,9 @@ export function Settings() {
   } = useApp();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  function handleDelete() {
-    if (!window.confirm(t('set.delete.confirm'))) return;
+  function handleConfirmDelete() {
     resetAll();
     navigate('/', { state: { deleted: true } });
   }
@@ -138,13 +139,37 @@ export function Settings() {
         </h2>
         <p className="mt-2 text-muted">{user ? t('set.data.bodyCloud') : t('set.data.body')}</p>
         <div className="mt-4">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="inline-flex min-h-11 items-center rounded-lg border border-red-700 bg-white px-5 py-2.5 font-semibold text-red-800 hover:bg-red-50"
-          >
-            {t('set.delete')}
-          </button>
+          {confirmingDelete ? (
+            <div className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4" role="alertdialog" aria-labelledby="delete-confirm-text">
+              <p id="delete-confirm-text" className="text-sm font-semibold text-red-900">
+                {t('set.delete.confirm')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="inline-flex min-h-11 items-center rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800"
+                >
+                  {t('set.delete')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className={btnSecondary}
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex min-h-11 items-center rounded-lg border border-red-700 bg-white px-5 py-2.5 font-semibold text-red-800 hover:bg-red-50"
+            >
+              {t('set.delete')}
+            </button>
+          )}
         </div>
       </section>
     </div>

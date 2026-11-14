@@ -2,9 +2,25 @@
 // If you change the AI provider later, only the server files in /api need to change.
 import type { Lang } from '../types';
 
+export interface ChatAttachment {
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+  data: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  attachment?: ChatAttachment;
+}
+
+export interface UserContextSummary {
+  situation?: string;
+  citizenship?: string;
+  accommodation?: string;
+  arrival?: string;
+  expiry?: string;
+  completedCount?: number;
+  totalCount?: number;
 }
 
 export type AiErrorCode = 'not_configured' | 'unreachable' | 'rate_limited' | 'failed';
@@ -59,8 +75,40 @@ async function post(body: unknown): Promise<string> {
 }
 
 /** Normal chat. `messages` is the conversation so far (the last one must be from the user). */
-export function sendChat(args: { messages: ChatMessage[]; language: Lang; procedureId?: string }): Promise<string> {
-  return post({ mode: 'chat', language: args.language, messages: args.messages.slice(-12), procedureId: args.procedureId });
+export function sendChat(args: {
+  messages: ChatMessage[];
+  language: Lang;
+  procedureId?: string;
+  userContext?: UserContextSummary;
+}): Promise<string> {
+  return post({
+    mode: 'chat',
+    language: args.language,
+    messages: args.messages.slice(-12),
+    procedureId: args.procedureId,
+    userContext: args.userContext,
+  });
+}
+
+/** Explain a pasted Romanian notice/email or uploaded photo/screenshot in plain words. */
+export function explainDocument(args: {
+  text: string;
+  attachment?: ChatAttachment;
+  language: Lang;
+  userContext?: UserContextSummary;
+}): Promise<string> {
+  return post({
+    mode: 'document',
+    language: args.language,
+    messages: [
+      {
+        role: 'user',
+        content: args.text.trim() || 'Please explain this Romanian document or notice.',
+        ...(args.attachment ? { attachment: args.attachment } : {}),
+      },
+    ],
+    userContext: args.userContext,
+  });
 }
 
 export interface GeneratedPhrase {

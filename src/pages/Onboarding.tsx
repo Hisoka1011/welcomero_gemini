@@ -255,7 +255,10 @@ export function Onboarding() {
       </form>
 
       <div className="mt-4 space-y-1 text-sm text-muted">
-        <p>🔒 {t('onb.privacy')}</p>
+        <p className="flex items-start gap-2">
+          <Icon name="shield" className="mt-0.5 size-4 text-brand-700" />
+          <span>{t('onb.privacy')}</span>
+        </p>
         <p>{t('onb.disclaimer')}</p>
       </div>
     </div>

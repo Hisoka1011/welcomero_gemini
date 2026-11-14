@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
@@ -32,6 +32,10 @@ export function Plan() {
   const { t, loc } = useI18n();
   const [draft, setDraft] = useState<PlanDates>(dates);
   const [touched, setTouched] = useState({ arrival: false, expiry: false });
+
+  useEffect(() => {
+    setDraft(dates);
+  }, [dates.arrival, dates.expiry]);
 
   const errors = validateDates(draft);
   const today = todayIso();

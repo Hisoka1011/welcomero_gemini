@@ -3,7 +3,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '../context/useI18n';
 import { Icon } from './Icon';
 import { copyText } from '../lib/clipboard';
-import { getSupport, speakRomanian, speechSupported, stopSpeaking, type SpeechSupport } from '../lib/speech';
+import {
+  checkTtsStatus,
+  getSupport,
+  speakRomanianAsync,
+  speechSupported,
+  stopSpeaking,
+  type SpeechSupport,
+} from '../lib/speech';
 import type { Reliability, TaskStatus } from '../types';
 
 export const btnPrimary =
@@ -162,50 +169,128 @@ export function CopyButton({ text, className }: { text: string; className?: stri
   );
 }
 
-/** Listen buttons (normal + slow) for a Romanian text, using the browser's speech engine. */
+function AudioWave() {
+  return (
+    <span className="inline-flex items-end gap-0.5" aria-hidden="true">
+      <span className="audio-wave-bar" />
+      <span className="audio-wave-bar" />
+      <span className="audio-wave-bar" />
+      <span className="audio-wave-bar" />
+    </span>
+  );
+}
+
+/** Listen buttons (normal + slow) for Romanian text: ElevenLabs natural voice first, browser fallback. */
 export function SpeakButtons({ text }: { text: string }) {
   const { t } = useI18n();
-  const [playing, setPlaying] = useState<'normal' | 'slow' | null>(null);
+  const [activeMode, setActiveMode] = useState<'normal' | 'slow' | null>(null);
+  const [loadingMode, setLoadingMode] = useState<'normal' | 'slow' | null>(null);
   const support = useSpeechSupport();
   useEffect(() => () => stopSpeaking(), []);
 
   if (support === 'unsupported') return null;
   const disabled = support === 'no-romanian-voice';
 
-  function play(slow: boolean) {
+  async function play(slow: boolean) {
     const mode = slow ? 'slow' : 'normal';
-    if (playing === mode) {
+    if (activeMode === mode || loadingMode === mode) {
       stopSpeaking();
-      setPlaying(null);
+      setActiveMode(null);
+      setLoadingMode(null);
       return;
     }
-    setPlaying(mode);
-    if (!speakRomanian(text, { slow, onEnd: () => setPlaying((cur) => (cur === mode ? null : cur)) })) setPlaying(null);
+    setLoadingMode(mode);
+    setActiveMode(null);
+
+    const engine = await speakRomanianAsync(text, {
+      slow,
+      onStart: () => {
+        setLoadingMode((cur) => (cur === mode ? null : cur));
+        setActiveMode(mode);
+      },
+      onEnd: () => {
+        setLoadingMode((cur) => (cur === mode ? null : cur));
+        setActiveMode((cur) => (cur === mode ? null : cur));
+      },
+    });
+
+    if (!engine) {
+      setLoadingMode(null);
+      setActiveMode(null);
+    }
   }
+
+  const normalActive = activeMode === 'normal';
+  const slowActive = activeMode === 'slow';
 
   return (
     <>
-      <button type="button" className={btnSecondary} onClick={() => play(false)} disabled={disabled} aria-pressed={playing === 'normal'}>
-        <Icon name={playing === 'normal' ? 'stop' : 'volume'} className="size-4" />
-        {playing === 'normal' ? t('help.stop') : t('help.listen')}
+      <button
+        type="button"
+        className={`${normalActive ? `${btnPrimary} ring-2 ring-brand-200 animate-pop` : btnSecondary} transition-all active:scale-95`}
+        onClick={() => void play(false)}
+        disabled={disabled}
+        aria-pressed={normalActive}
+      >
+        {normalActive ? (
+          <>
+            <AudioWave />
+            <span>{t('help.stop')}</span>
+          </>
+        ) : (
+          <>
+            <Icon name={loadingMode === 'normal' ? 'timer' : 'volume'} className="size-4" />
+            <span>{loadingMode === 'normal' ? t('help.speech.loading') : t('help.listen')}</span>
+          </>
+        )}
       </button>
-      <button type="button" className={btnSecondary} onClick={() => play(true)} disabled={disabled} aria-pressed={playing === 'slow'}>
-        <Icon name={playing === 'slow' ? 'stop' : 'timer'} className="size-4" />
-        {playing === 'slow' ? t('help.stop') : t('help.listenSlow')}
+      <button
+        type="button"
+        className={`${slowActive ? `${btnPrimary} ring-2 ring-brand-200 animate-pop` : btnSecondary} transition-all active:scale-95`}
+        onClick={() => void play(true)}
+        disabled={disabled}
+        aria-pressed={slowActive}
+      >
+        {slowActive ? (
+          <>
+            <AudioWave />
+            <span>{t('help.stop')}</span>
+          </>
+        ) : (
+          <>
+            <Icon name="timer" className="size-4" />
+            <span>{loadingMode === 'slow' ? t('help.speech.loading') : t('help.listenSlow')}</span>
+          </>
+        )}
       </button>
     </>
   );
 }
 
-/** Voices load asynchronously in most browsers, so listen for the change. */
+/** Voices load asynchronously in most browsers, and ElevenLabs availability is checked once from /api/tts. */
 export function useSpeechSupport(): SpeechSupport {
   const [support, setSupport] = useState<SpeechSupport>(getSupport);
   useEffect(() => {
-    if (!speechSupported()) return;
-    const update = () => setSupport(getSupport());
-    update();
-    window.speechSynthesis.addEventListener?.('voiceschanged', update);
-    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', update);
+    let cancelled = false;
+    checkTtsStatus().then((status) => {
+      if (!cancelled && status.elevenLabsConfigured) {
+        setSupport('elevenlabs');
+      }
+    });
+    if (speechSupported()) {
+      const update = () => {
+        if (!cancelled) setSupport(getSupport());
+      };
+      update();
+      window.speechSynthesis.addEventListener?.('voiceschanged', update);
+      return () => {
+        cancelled = true;
+        window.speechSynthesis.removeEventListener?.('voiceschanged', update);
+      };
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return support;
 }

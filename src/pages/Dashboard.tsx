@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
-import { buildPlan, todayIso } from '../lib/plan';
+import { buildPlan, formatDate, todayIso } from '../lib/plan';
 import { docCounts } from '../lib/docs';
 import { effectiveStatus, nextUp, pendingDependencies, timeSensitive } from '../lib/checklist';
 import { Arrow, btnSecondary, cardClass, LevelBadge, Notice, PageHeader, ProgressRing, StatusBadge } from '../components/ui';
@@ -18,7 +18,7 @@ const QUICK_LINKS: Array<{ to: string; key: MessageKey; icon: IconName }> = [
 ];
 
 export function Dashboard() {
-  const { tasks, progress, summary, setTaskStatus, dates, docs } = useApp();
+  const { tasks, progress, summary, setTaskStatus, dates, docs, language, user } = useApp();
   const { t, loc } = useI18n();
 
   const upcoming = nextUp(tasks, progress, 3);
@@ -101,7 +101,7 @@ export function Dashboard() {
               {heroPlan ? (
                 <li className="flex items-center gap-1.5">
                   <Icon name="calendar" className="size-4" />
-                  {t('dash.suggestedBy', { date: heroPlan.date })}
+                  {t('dash.suggestedBy', { date: formatDate(heroPlan.date, language) })}
                 </li>
               ) : (
                 <li>
@@ -195,7 +195,7 @@ export function Dashboard() {
         </ul>
       </section>
 
-      <p className="text-sm text-muted">{t('dash.storage')}</p>
+      <p className="text-sm text-muted">{user ? t('set.data.bodyCloud') : t('dash.storage')}</p>
     </div>
   );
 }

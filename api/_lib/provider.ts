@@ -2,9 +2,15 @@
 // so switching to another model provider later means adding one object here and changing getProvider().
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
+export interface ChatAttachment {
+  mimeType: string;
+  data: string; // base64 without data: prefix
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  attachment?: ChatAttachment;
 }
 
 export interface CompleteArgs {
@@ -31,7 +37,7 @@ export class ProviderError extends Error {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 18_000;
 
 /** Sends one JSON request and turns every failure into a ProviderError with a safe, generic message. */
 
@@ -109,6 +115,22 @@ const anthropicProvider: AiProvider = {
   async complete({ system, messages, maxTokens }) {
     const apiKey = readEnvKey("ANTHROPIC_API_KEY");
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
+    const mapped = messages.map((m) => ({
+      role: m.role,
+      content: m.attachment
+        ? [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: m.attachment.mimeType,
+                data: m.attachment.data,
+              },
+            },
+            { type: "text", text: m.content },
+          ]
+        : m.content,
+    }));
     const data = (await postJson(
       ANTHROPIC_URL,
       { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
@@ -116,7 +138,7 @@ const anthropicProvider: AiProvider = {
         model: process.env.AI_MODEL || "claude-sonnet-5-5",
         max_tokens: maxTokens,
         system,
-        messages,
+        messages: mapped,
       },
     )) as { content?: Array<{ type: string; text?: string }> };
     return nonEmpty(
@@ -130,7 +152,7 @@ const anthropicProvider: AiProvider = {
   },
 };
 
-// ---- Google Gemini (has a free tier, no credit card) -------------------------------------------
+// ---- Google Gemini (default, supports text + multimodal images) -------------------------------
 const geminiProvider: AiProvider = {
   name: "gemini",
 
@@ -141,7 +163,8 @@ const geminiProvider: AiProvider = {
   async complete({ system, messages, maxTokens }) {
     const apiKey = readEnvKey("GEMINI_API_KEY");
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
-    const model = process.env.GEMINI_MODEL || process.env.AI_MODEL || "gemini-3.1-flash-lite";
+    const model =
+      process.env.GEMINI_MODEL || process.env.AI_MODEL || "gemini-4-hydrogen";
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -152,23 +175,45 @@ const geminiProvider: AiProvider = {
       },
     });
 
+    const isGemini4 = model.startsWith("gemini-4");
+    const isGemini3 = model.startsWith("gemini-3");
+
     try {
       const response = await ai.models.generateContent({
         model,
-        contents: messages.map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        })),
+        contents: messages.map((m) => {
+          const parts: Array<
+            { text: string } | { inlineData: { mimeType: string; data: string } }
+          > = [];
+          if (m.attachment) {
+            parts.push({
+              inlineData: {
+                mimeType: m.attachment.mimeType,
+                data: m.attachment.data,
+              },
+            });
+          }
+          parts.push({ text: m.content });
+          return {
+            role: m.role === "assistant" ? "model" : "user",
+            parts,
+          };
+        }),
         config: {
           systemInstruction: system,
-          maxOutputTokens: maxTokens,
-          ...(model.startsWith("gemini-3")
-            ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
-            : model.startsWith("gemini-4")
-              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+          ...(isGemini4
+            ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+            : isGemini3
+              ? {
+                  maxOutputTokens: maxTokens,
+                  thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+                }
               : model.startsWith("gemini-2.5-flash")
-                ? { thinkingConfig: { thinkingBudget: 0 } }
-                : {}),
+                ? {
+                    maxOutputTokens: maxTokens,
+                    thinkingConfig: { thinkingBudget: 0 },
+                  }
+                : { maxOutputTokens: maxTokens }),
           abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         },
       });
@@ -186,7 +231,11 @@ const geminiProvider: AiProvider = {
           ? (error as { status: number }).status
           : undefined;
       const msg = error instanceof Error ? error.message : String(error);
-      if (status === 429 || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+      if (
+        status === 429 ||
+        msg.includes("429") ||
+        msg.includes("RESOURCE_EXHAUSTED")
+      ) {
         throw new ProviderError(`HTTP 429: ${msg}`, "rate_limited");
       }
       throw new ProviderError(msg || "Upstream error", "upstream");
@@ -207,13 +256,18 @@ const groqProvider: AiProvider = {
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
     const model =
       process.env.GROQ_MODEL ||
-      (!readEnvKey("GEMINI_API_KEY") || process.env.AI_PROVIDER?.trim().toLowerCase() === "groq"
+      (!readEnvKey("GEMINI_API_KEY") ||
+      process.env.AI_PROVIDER?.trim().toLowerCase() === "groq"
         ? process.env.AI_MODEL
         : undefined) ||
       "openai/gpt-oss-20b";
+    const textMessages = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     const body: Record<string, unknown> = {
       model,
-      messages: [{ role: "system", content: system }, ...messages],
+      messages: [{ role: "system", content: system }, ...textMessages],
       max_completion_tokens: maxTokens,
       temperature: 0.3,
     };

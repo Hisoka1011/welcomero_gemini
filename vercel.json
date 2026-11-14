@@ -2,6 +2,15 @@
   "functions": {
     "api/chat.ts": {
       "includeFiles": "src/data/**"
+    },
+    "api/sources-monitor.ts": {
+      "includeFiles": "src/data/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/sources-monitor",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

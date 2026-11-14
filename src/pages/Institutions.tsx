@@ -1,10 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useI18n } from '../context/useI18n';
 import { institutions } from '../data';
 import { getInstitutionVisual } from '../lib/institutions';
 import { Icon } from '../components/Icon';
 import { InstitutionMinimap } from '../components/InstitutionMinimap';
 import { cardClass, linkClass, Notice, PageHeader } from '../components/ui';
+import { SourceMonitorCard } from '../components/SourceMonitorCard';
 import type { Institution } from '../types';
 
 function mapsUrl(address: string): string {
@@ -103,7 +105,17 @@ function InstitutionCard({ institution, selected }: { institution: Institution; 
 
 export function Institutions() {
   const { t } = useI18n();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get('focus');
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    focusId && institutions.some((inst) => inst.id === focusId) ? focusId : null,
+  );
+
+  useEffect(() => {
+    if (focusId && institutions.some((inst) => inst.id === focusId)) {
+      setSelectedId(focusId);
+    }
+  }, [focusId]);
 
   const handleJumpToCard = useCallback((id: string) => {
     setSelectedId(id);
@@ -130,6 +142,7 @@ export function Institutions() {
           />
         ))}
       </div>
+      <SourceMonitorCard />
     </div>
   );
 }

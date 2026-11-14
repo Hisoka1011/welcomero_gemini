@@ -141,7 +141,7 @@
     },
     "whoDoesNot": {
       "en": "Romanian citizens register their residence through the city hall population-records service. Check whether anything applies to you as a foreign citizen.",
-      "ro": "Cetățenii români își înregistrează reședința la serviciul de evidență a persoanelor din primărie. Verifică dacă ceva se aplică și ție, ca cetățean străin.",
+      "ro": "Cetățenii români își înregistrează reședința la serviciul de evidență a persoanelor din primărie. Verifică dacă aceste reguli se aplică și în cazul tău, ca cetățean străin.",
       "fr": "Les citoyens roumains enregistrent leur résidence auprès du service d’état civil de la mairie. Vérifiez ce qui s’applique à vous en tant que citoyen étranger.",
       "ar": "يسجّل المواطنون الرومانيون إقامتهم لدى مصلحة سجلات السكان في البلدية. تحقق مما ينطبق عليك كمواطن أجنبي."
     },
@@ -228,25 +228,25 @@
     },
     "summary": {
       "en": "Find out which health cover you need. EU students may be able to use a card from their home country; others may need Romanian or private insurance. Confirm with your university and CNAS.",
-      "ro": "Află ce asigurare de sănătate ți se potrivește. Studenții din UE pot folosi uneori un card din țara de origine; ceilalți pot avea nevoie de asigurare românească sau privată. Confirmă la universitate și la CNAS.",
+      "ro": "Află de ce asigurare de sănătate ai nevoie. Studenții din UE pot folosi uneori cardul european din țara de origine; ceilalți pot avea nevoie de asigurare în România sau privată. Confirmă la universitate și la CNAS.",
       "fr": "Découvrez de quelle couverture santé vous avez besoin. Les étudiants de l’UE peuvent parfois utiliser une carte de leur pays ; les autres peuvent avoir besoin d’une assurance roumaine ou privée. Confirmez auprès de votre université et de la CNAS.",
       "ar": "اعرف أي تأمين صحي تحتاج. قد يستطيع طلاب الاتحاد الأوروبي استخدام بطاقة من بلدهم، وقد يحتاج الآخرون إلى تأمين روماني أو خاص. تأكد من جامعتك ومن CNAS."
     },
     "why": {
       "en": "Health care can be expensive without cover, and some applications may ask for proof of insurance. This has not been confirmed for every case.",
-      "ro": "Îngrijirea medicală poate fi costisitoare fără asigurare, iar unele cereri pot cere dovada asigurării. Nu a fost confirmat pentru toate cazurile.",
+      "ro": "Serviciile medicale pot fi costisitoare fără asigurare, iar pentru unele cereri ți se poate solicita dovada asigurării. Acest lucru nu a fost confirmat pentru toate cazurile.",
       "fr": "Les soins peuvent coûter cher sans couverture, et certaines demandes peuvent exiger une preuve d’assurance. Cela n’a pas été confirmé pour tous les cas.",
       "ar": "قد تكون الرعاية الصحية باهظة دون تأمين، وقد تطلب بعض الطلبات إثباتًا للتأمين. لم يتم التأكد من ذلك في كل الحالات."
     },
     "whoNeeds": {
       "en": "All newcomers. The kind of cover you need depends on your citizenship, any scholarship, and your permit type.",
-      "ro": "Toți nou-veniții. Tipul de asigurare depinde de cetățenie, de eventuala bursă și de tipul permisului.",
+      "ro": "Toți nou-veniții. Tipul de asigurare depinde de cetățenie, de o eventuală bursă și de tipul permisului.",
       "fr": "Tous les nouveaux arrivants. Le type de couverture dépend de votre nationalité, d’une éventuelle bourse et de votre type de titre.",
       "ar": "جميع القادمين الجدد. يعتمد نوع التأمين على جنسيتك وعلى أي منحة دراسية ونوع الإذن."
     },
     "whoDoesNot": {
       "en": "Some people may already be covered, for example through an employer or a scholarship. Ask your university or CNAS.",
-      "ro": "Unele persoane pot fi deja acoperite, de exemplu prin angajator sau printr-o bursă. Întreabă universitatea sau CNAS.",
+      "ro": "Unele persoane pot fi deja asigurate, de exemplu prin angajator sau printr-o bursă. Întreabă la universitate sau la CNAS.",
       "fr": "Certaines personnes sont peut-être déjà couvertes, par exemple par un employeur ou une bourse. Demandez à votre université ou à la CNAS.",
       "ar": "قد يكون بعض الأشخاص مشمولين بالفعل، مثلًا عبر صاحب العمل أو المنحة. اسأل جامعتك أو CNAS."
     },
@@ -612,7 +612,7 @@
     },
     "summary": {
       "en": "The CNP is Romania’s personal identification number. Whether and when a foreign student receives one depends on the permit or registration type. Ask IGI.",
-      "ro": "CNP este numărul personal de identificare din România. Dacă și când îl primește un student străin depinde de tipul permisului sau al înregistrării. Întreabă la IGI.",
+      "ro": "CNP-ul este codul numeric personal de identificare din România. Dacă și când îl primește un student străin depinde de tipul permisului sau al înregistrării. Întreabă la IGI.",
       "fr": "Le CNP est le numéro d’identification personnel roumain. Savoir si un étudiant étranger en reçoit un, et quand, dépend du type de titre ou d’enregistrement. Demandez à l’IGI.",
       "ar": "الـ CNP هو رقم التعريف الشخصي في رومانيا. يعتمد حصول الطالب الأجنبي عليه وموعد ذلك على نوع التصريح أو التسجيل. اسأل IGI."
     },
@@ -687,25 +687,25 @@
     },
     "summary": {
       "en": "Most students do not need a tax number right away. You may need one if you work, sign certain contracts, or the tax authority (ANAF) asks. Check before you go.",
-      "ro": "Majoritatea studenților nu au nevoie imediat de un număr fiscal. Poate fi necesar dacă lucrezi, semnezi anumite contracte sau dacă ANAF îți cere. Verifică înainte să mergi.",
+      "ro": "Majoritatea studenților nu au nevoie imediat de un număr fiscal. Poate fi necesar dacă lucrezi, semnezi anumite contracte sau dacă ANAF îl solicită. Verifică înainte să mergi.",
       "fr": "La plupart des étudiants n’ont pas besoin tout de suite d’un numéro fiscal. Il peut être nécessaire si vous travaillez, signez certains contrats ou si l’ANAF le demande. Vérifiez avant d’y aller.",
       "ar": "لا يحتاج معظم الطلاب إلى رقم ضريبي فورًا. قد تحتاجه إذا عملت أو وقّعت عقودًا معينة أو طلبته الإدارة الضريبية (ANAF). تحقق قبل أن تذهب."
     },
     "why": {
       "en": "Employers, banks or contracts may ask for a tax number. Whether you need one depends on what you plan to do. This has not been verified.",
-      "ro": "Angajatorii, băncile sau contractele pot cere un număr fiscal. Dacă ai nevoie depinde de ce îți propui să faci. Nu a fost verificat.",
+      "ro": "Angajatorii, băncile sau anumite contracte pot cere un număr fiscal. Nevoia unui astfel de număr depinde de ce intenționezi să faci. Acest aspect nu a fost verificat.",
       "fr": "Employeurs, banques ou contrats peuvent demander un numéro fiscal. Le besoin dépend de ce que vous comptez faire. Non vérifié.",
       "ar": "قد يطلب أصحاب العمل أو البنوك أو العقود رقمًا ضريبيًا. تعتمد حاجتك إليه على ما تنوي فعله. لم يتم التحقق من ذلك."
     },
     "whoNeeds": {
       "en": "Foreign citizens in certain situations, for example paid work. Confirm with ANAF or your employer.",
-      "ro": "Cetățenii străini în anumite situații, de exemplu muncă remunerată. Confirmă la ANAF sau la angajator.",
+      "ro": "Cetățenii străini în anumite situații, de exemplu pentru muncă remunerată. Confirmă la ANAF sau la angajator.",
       "fr": "Les citoyens étrangers dans certaines situations, par exemple un travail rémunéré. Confirmez auprès de l’ANAF ou de votre employeur.",
       "ar": "الأجانب في حالات معينة، مثل العمل بأجر. تأكد من ANAF أو صاحب العمل."
     },
     "whoDoesNot": {
       "en": "Many students who do not work or sign tax-related contracts. This is not verified.",
-      "ro": "Mulți studenți care nu lucrează și nu semnează contracte cu implicații fiscale. Nu este verificat.",
+      "ro": "Mulți studenți care nu lucrează și nu semnează contracte cu obligații fiscale. Acest lucru nu este verificat.",
       "fr": "De nombreux étudiants qui ne travaillent pas ni ne signent de contrats à effet fiscal. Non vérifié.",
       "ar": "كثير من الطلاب الذين لا يعملون ولا يوقّعون عقودًا ذات أثر ضريبي. لم يتم التحقق من ذلك."
     },

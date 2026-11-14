@@ -4,6 +4,7 @@ import { useI18n } from '../context/useI18n';
 import { procedures } from '../data';
 import { effectiveStatus } from '../lib/checklist';
 import { Arrow, cardClass, PageHeader, StatusBadge } from '../components/ui';
+import { SourceMonitorCard } from '../components/SourceMonitorCard';
 import type { Procedure } from '../types';
 
 export function Guides() {
@@ -57,6 +58,7 @@ export function Guides() {
           {renderList(other, false)}
         </section>
       ) : null}
+      <SourceMonitorCard />
     </div>
   );
 }

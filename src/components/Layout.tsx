@@ -100,7 +100,7 @@ function Header() {
 }
 
 function Footer() {
-  const { profile } = useApp();
+  const { profile, user } = useApp();
   const { t } = useI18n();
   return (
     <footer className="no-print mt-16 border-t border-slate-200 bg-white">
@@ -108,7 +108,7 @@ function Footer() {
         <div>
           <p className="font-bold text-brand-900">{t('app.name')}</p>
           <p className="mt-2 text-sm text-muted">{t('footer.about')}</p>
-          <p className="mt-2 text-sm text-muted">{t('footer.storage')}</p>
+          <p className="mt-2 text-sm text-muted">{user ? t('set.data.bodyCloud') : t('footer.storage')}</p>
         </div>
         <div>
           <p className="font-semibold text-brand-900">{t('footer.links')}</p>

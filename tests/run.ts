@@ -340,6 +340,7 @@ describe('translations', () => {
       'level.': ['verified', 'recommended', 'confirm'], 'note.': ['findAccommodationFirst', 'accommodationUnsure', 'needsAccommodation', 'preCompleted', 'addressNotRegistered'],
       'guide.sourceKind.': ['government', 'university', 'eu', 'ngo'], 'priority.': ['high', 'low'], 'ai.ex.': ['1', '2', '3', '4', '5'],
       'check.filter.': ['all', 'todo', 'progress', 'done'], 'guide.s': ['1', '2', '3', '4', '6', '7', '8', '9', '10'],
+      'monitor.status.': ['verified_unchanged', 'updated', 'unreachable', 'pending'],
     };
     for (const prefix of dynamicPrefixes) {
       assert.ok(values[prefix], `dynamic key prefix "${prefix}" is not covered by this test; add it`);
@@ -662,9 +663,9 @@ describe('appointment kit data and speech text', () => {
   });
 });
 
-describe('AI providers: Gemini and Groq (free tiers) with a fake network', () => {
+describe('AI providers: Gemini (with @google/genai) and Groq with a fake network', () => {
   const realFetch = globalThis.fetch;
-  const names = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'AI_PROVIDER', 'AI_MODEL'] as const;
+  const names = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GEMINI_MODEL', 'GROQ_API_KEY', 'AI_PROVIDER', 'AI_MODEL'] as const;
   const saved: Record<string, string | undefined> = {};
   const setup = (env: Partial<Record<(typeof names)[number], string>>) => {
     for (const n of names) { saved[n] = process.env[n]; delete process.env[n]; }
@@ -679,45 +680,95 @@ describe('AI providers: Gemini and Groq (free tiers) with a fake network', () =>
   type Seen = { url: string; headers: Record<string, string>; raw: string; body: Record<string, any> };
   const capture = (reply: unknown, status = 200) => {
     const box: { seen: Seen | null } = { seen: null };
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
-      const headers = Object.fromEntries(new Headers(init.headers).entries());
-      box.seen = { url: String(url), headers, raw: init.body as string, body: JSON.parse(init.body as string) };
-      return new Response(JSON.stringify(reply), { status });
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const mergedHeaders = new Headers(input instanceof Request ? input.headers : undefined);
+      if (init?.headers) {
+        new Headers(init.headers).forEach((v, k) => mergedHeaders.set(k, v));
+      }
+      const headers = Object.fromEntries(mergedHeaders.entries());
+      const raw = typeof init?.body === 'string'
+        ? init.body
+        : input instanceof Request
+          ? await input.clone().text()
+          : '';
+      box.seen = { url, headers, raw, body: raw ? JSON.parse(raw) : {} };
+      return new Response(JSON.stringify(reply), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
     }) as unknown as typeof fetch;
     return box;
   };
 
-  it('Gemini: calls generateContent with the key in a header (not the URL) and maps roles and system prompt', async () => {
+  it('Gemini: uses gemini-4-hydrogen via @google/genai with key in header, LOW thinking, and User-Agent', async () => {
     setup({ GEMINI_API_KEY: 'g-secret' });
     const box = capture({ candidates: [{ content: { parts: [{ text: 'The CNP is ' }, { text: 'a personal code.' }] } }] });
     try {
       const { GET, POST } = await import('../api/chat');
-      assert.deepEqual(await GET().json(), { configured: true });
+      assert.deepEqual(await GET().json(), { configured: true, provider: 'gemini' });
       const res = await POST(post(goodBody));
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { reply: 'The CNP is a personal code.' });
       const s = box.seen as Seen;
-      assert.ok(s.url.includes('/models/gemini-3.1-flash-lite:generateContent'));
+      assert.ok(s.url.includes('/models/gemini-4-hydrogen:generateContent'), `unexpected url: ${s.url}`);
       assert.ok(!s.url.includes('g-secret'), 'key must not be in the URL');
       assert.equal(s.headers['x-goog-api-key'], 'g-secret');
       assert.ok(!s.raw.includes('g-secret'), 'key must not be in the body');
       assert.deepEqual(s.body.contents.map((c: any) => c.role), ['user', 'model', 'user']);
-      assert.ok(s.body.systemInstruction.parts[0].text.includes('Residence permit for studies'));
-      assert.deepEqual(s.body.generationConfig.thinkingConfig, { thinkingLevel: 'MINIMAL' });
-      assert.ok(s.body.generationConfig.maxOutputTokens > 0);
+      const sysText = s.body.systemInstruction.parts[0].text;
+      assert.ok(sysText.includes('Residence permit for studies'));
+      assert.deepEqual(s.body.generationConfig.thinkingConfig, { thinkingLevel: 'LOW' });
+      assert.equal(s.body.generationConfig.maxOutputTokens, undefined);
     } finally { restore(); }
   });
 
-  it('Gemini: ignores "thought" parts, honours AI_MODEL, and skips the thinking switch for non-thinking models', async () => {
+  it('Gemini: ignores "thought" parts, honours AI_MODEL, and handles multimodal image + userContext', async () => {
     setup({ GEMINI_API_KEY: 'g', AI_MODEL: 'gemini-custom-test' });
     const box = capture({ candidates: [{ content: { parts: [{ text: 'internal reasoning', thought: true }, { text: 'Final answer.' }] } }] });
     try {
       const { POST } = await import('../api/chat');
-      const res = await POST(post(goodBody));
+      const res = await POST(post({
+        mode: 'document',
+        language: 'en',
+        userContext: { situation: 'student', citizenship: 'non-eu', completedCount: 2, totalCount: 7 },
+        messages: [
+          {
+            role: 'user',
+            content: 'Explain this Romanian notice.',
+            attachment: { mimeType: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' },
+          },
+        ],
+      }));
+      assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { reply: 'Final answer.' });
       const s = box.seen as Seen;
       assert.ok(s.url.includes('/models/gemini-custom-test:generateContent'));
       assert.equal(s.body.generationConfig.thinkingConfig, undefined);
+      assert.equal(s.body.contents[0].parts[0].inlineData.mimeType, 'image/png');
+      const sysText = s.body.systemInstruction.parts[0].text;
+      assert.ok(sysText.includes('student'));
+      assert.ok(sysText.includes('non-eu'));
+      assert.ok(sysText.includes('2/7'));
+    } finally { restore(); }
+  });
+
+  it('Gemini: skips text-only Groq when an image is attached', async () => {
+    setup({ GROQ_API_KEY: 'q-secret' });
+    try {
+      const { POST } = await import('../api/chat');
+      const res = await POST(post({
+        mode: 'document',
+        language: 'en',
+        messages: [
+          {
+            role: 'user',
+            content: 'Explain this notice.',
+            attachment: { mimeType: 'image/png', data: 'AQID' },
+          },
+        ],
+      }));
+      assert.equal(res.status, 503);
     } finally { restore(); }
   });
 
@@ -789,3 +840,81 @@ describe('AI providers: Gemini and Groq (free tiers) with a fake network', () =>
     } finally { restore(); }
   });
 });
+
+describe('ElevenLabs TTS proxy (/api/tts)', () => {
+  const realFetch = globalThis.fetch;
+  const savedKey = process.env.ELEVENLABS_API_KEY;
+  const restore = () => {
+    globalThis.fetch = realFetch;
+    if (savedKey === undefined) delete process.env.ELEVENLABS_API_KEY;
+    else process.env.ELEVENLABS_API_KEY = savedKey;
+  };
+
+  it('reports browser fallback when unconfigured and proxies audio/mpeg when configured', async () => {
+    try {
+      delete process.env.ELEVENLABS_API_KEY;
+      const { GET, POST } = await import('../api/tts');
+      assert.deepEqual(await GET().json(), {
+        configured: false,
+        provider: 'browser',
+        voices: [
+          { key: 'warm', label: 'Warm & Clear' },
+          { key: 'calm', label: 'Calm & Steady' },
+        ],
+      });
+      const unconfRes = await POST(new Request('http://localhost/api/tts', { method: 'POST', body: JSON.stringify({ text: 'Bună ziua' }) }));
+      assert.equal(unconfRes.status, 503);
+
+      process.env.ELEVENLABS_API_KEY = 'el-secret';
+      assert.equal((await GET().json()).configured, true);
+
+      let capturedHeaders: Record<string, string> = {};
+      let capturedBody: Record<string, any> = {};
+      globalThis.fetch = (async (_url: string, init: RequestInit) => {
+        capturedHeaders = Object.fromEntries(new Headers(init.headers).entries());
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(new Uint8Array([1, 2, 3, 4]), {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg' },
+        });
+      }) as unknown as typeof fetch;
+
+      const res = await POST(new Request('http://localhost/api/tts', {
+        method: 'POST',
+        body: JSON.stringify({ text: 'Mă numesc [numele meu].', speed: 'slow', voice: 'calm' }),
+      }));
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get('content-type'), 'audio/mpeg');
+      assert.equal(capturedHeaders['xi-api-key'], 'el-secret');
+      assert.equal(capturedBody.language_code, 'ro');
+      assert.equal(capturedBody.voice_settings.speed, 0.78);
+      assert.ok(!String(capturedBody.text).includes('['), 'brackets are stripped before TTS');
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('Official Government Source Monitor allowlist & extraction', () => {
+  it('only allows verified HTTPS official Romanian government, EU, university, and NGO domains', async () => {
+    const { isOfficialAllowedUrl, extractTextFromHtml, extractHighlights, loadSourceRegistry } = await import('../api/_lib/sourcesMonitor');
+    assert.equal(isOfficialAllowedUrl('https://igi.mai.gov.ro/en/'), true);
+    assert.equal(isOfficialAllowedUrl('https://www.anaf.ro/anaf/internet/ANAF'), true);
+    assert.equal(isOfficialAllowedUrl('http://igi.mai.gov.ro/en/'), false, 'plain HTTP must be rejected');
+    assert.equal(isOfficialAllowedUrl('https://evil-mai.gov.ro.attacker.com/'), false, 'spoofed domain suffix must be rejected');
+    assert.equal(isOfficialAllowedUrl('http://127.0.0.1:3000/api/chat'), false, 'localhost SSRF must be rejected');
+
+    for (const [id, src] of Object.entries(loadSourceRegistry())) {
+      assert.equal(isOfficialAllowedUrl(src.url), true, `source ${id} must pass official allowlist`);
+    }
+
+    const clean = extractTextFromHtml('<html><head><script>alert(1)</script><style>.a{}</style></head><body><h1>Program IGI</h1><p>Tel: +40 256 402 450 &amp; email@mai.gov.ro</p></body></html>');
+    assert.ok(!clean.includes('alert(1)'));
+    assert.ok(clean.includes('Program IGI'));
+    assert.ok(clean.includes('+40 256 402 450 & email@mai.gov.ro'));
+    const highlights = extractHighlights(clean);
+    assert.ok(highlights.some((h) => h.includes('256')));
+    assert.ok(highlights.some((h) => h.includes('email@mai.gov.ro')));
+  });
+});
+

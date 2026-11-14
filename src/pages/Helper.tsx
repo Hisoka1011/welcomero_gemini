@@ -6,6 +6,8 @@ import { AiError, checkAvailability, generatePhrase, type AiAvailability, type G
 import { btnPrimary, CopyButton, cardClass, inputClass, Notice, PageHeader, SpeakButtons, useSpeechSupport } from '../components/ui';
 import type { MessageKey } from '../i18n';
 import type { Phrase } from '../types';
+import { Icon } from '../components/Icon';
+import { getSelectedVoice, setSelectedVoice, subscribeVoiceChange, type VoiceKey } from '../lib/speech';
 
 function PhraseCard({ phrase }: { phrase: Phrase }) {
   const { t, loc, lang } = useI18n();
@@ -166,13 +168,59 @@ function CustomMessage() {
   );
 }
 
+function VoiceStudioBar() {
+  const { t } = useI18n();
+  const [voice, setVoice] = useState<VoiceKey>(getSelectedVoice);
+
+  useEffect(() => subscribeVoiceChange(() => setVoice(getSelectedVoice())), []);
+
+  const voices: Array<{ key: VoiceKey; labelKey: MessageKey }> = [
+    { key: 'warm', labelKey: 'help.speech.voice.warm' },
+    { key: 'calm', labelKey: 'help.speech.voice.calm' },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 via-white to-sun-100/60 px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2.5">
+        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-brand-700 text-white shadow-sm">
+          <Icon name="volume" className="size-4" />
+        </span>
+        <p className="text-sm font-medium text-brand-900">{t('help.speech.elevenlabs')}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('help.speech.voiceLabel')}>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">{t('help.speech.voiceLabel')}:</span>
+        {voices.map((v) => {
+          const active = voice === v.key;
+          return (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => setSelectedVoice(v.key)}
+              aria-pressed={active}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                active
+                  ? 'bg-brand-700 text-white shadow-sm'
+                  : 'border border-brand-200 bg-white text-brand-800 hover:bg-brand-50'
+              }`}
+            >
+              {t(v.labelKey)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function Helper() {
   const { t } = useI18n();
   const support = useSpeechSupport();
   return (
     <div className="space-y-6">
       <PageHeader title={t('help.title')} subtitle={t('help.subtitle')} />
-      {support !== 'ready' ? (
+      {support === 'elevenlabs' ? (
+        <VoiceStudioBar />
+      ) : support !== 'ready' ? (
         <Notice tone="warning" role="status">
           {t(support === 'unsupported' ? 'help.speech.unsupported' : 'help.speech.noVoice')}
         </Notice>

@@ -2,6 +2,9 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { GET as handleChatGet, POST as handleChatPost } from './api/chat';
+import { GET as handleTtsGet, POST as handleTtsPost } from './api/tts';
+import { GET as handleSourcesGet, POST as handleSourcesPost } from './api/sources-monitor';
+import { refreshOfficialSources } from './api/_lib/sourcesMonitor';
 
 for (const envFile of ['.env.local', '.env']) {
   if (existsSync(envFile)) {
@@ -29,13 +32,15 @@ const MIME_TYPES: Record<string, string> = {
   '.woff2': 'font/woff2',
 };
 
-function readBody(req: IncomingMessage): Promise<Buffer> {
+const SOURCE_MONITOR_INTERVAL_MS = 30 * 60 * 1000;
+
+function readBody(req: IncomingMessage, maxBytes = 100_000): Promise<Buffer> {
   return new Promise((resolveBody, rejectBody) => {
     const chunks: Buffer[] = [];
     let total = 0;
     req.on('data', (chunk: Buffer) => {
       total += chunk.length;
-      if (total > 100_000) {
+      if (total > maxBytes) {
         rejectBody(new Error('Payload too large'));
         req.destroy();
         return;
@@ -47,25 +52,33 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
-async function handleApiChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleWebRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  handlers: {
+    get: () => Response | Promise<Response>;
+    post: (request: Request) => Promise<Response>;
+  },
+  maxBodyBytes = 100_000,
+): Promise<void> {
   try {
     let webRes: Response;
     if (req.method === 'GET') {
-      webRes = handleChatGet();
+      webRes = await handlers.get();
     } else if (req.method === 'POST') {
-      const body = await readBody(req);
+      const body = await readBody(req, maxBodyBytes);
       const headers = new Headers();
       for (const [k, v] of Object.entries(req.headers)) {
         if (typeof v === 'string') headers.set(k, v);
         else if (Array.isArray(v)) headers.set(k, v.join(', '));
       }
-      const url = `http://${req.headers.host || 'localhost:3000'}${req.url || '/api/chat'}`;
+      const url = `http://${req.headers.host || 'localhost:3000'}${req.url || '/'}`;
       const webReq = new Request(url, {
         method: 'POST',
         headers,
         body: new Uint8Array(body),
       });
-      webRes = await handleChatPost(webReq);
+      webRes = await handlers.post(webReq);
     } else {
       res.statusCode = 405;
       res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -117,7 +130,15 @@ async function start(): Promise<void> {
   const server = createHttpServer((req, res) => {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     if (pathname === '/api/chat') {
-      void handleApiChat(req, res);
+      void handleWebRoute(req, res, { get: handleChatGet, post: handleChatPost }, 6_200_000);
+      return;
+    }
+    if (pathname === '/api/tts') {
+      void handleWebRoute(req, res, { get: handleTtsGet, post: handleTtsPost }, 100_000);
+      return;
+    }
+    if (pathname === '/api/sources-monitor') {
+      void handleWebRoute(req, res, { get: handleSourcesGet, post: handleSourcesPost }, 16_000);
       return;
     }
 
@@ -130,6 +151,13 @@ async function start(): Promise<void> {
 
   server.listen(port, '0.0.0.0', () => {
     console.log(`welcomeRo server listening on http://localhost:${port}`);
+    // Run an initial non-blocking sweep 5 seconds after boot and keep checking every 30 minutes.
+    setTimeout(() => {
+      void refreshOfficialSources({ force: true }).catch(() => undefined);
+    }, 5_000);
+    setInterval(() => {
+      void refreshOfficialSources({ force: false }).catch(() => undefined);
+    }, SOURCE_MONITOR_INTERVAL_MS).unref();
   });
 }
 

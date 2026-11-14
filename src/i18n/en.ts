@@ -242,7 +242,7 @@ export const en = {
   'ai.checking': 'Checking whether the assistant is available…',
   'ai.unavailable.title': 'The assistant is not available right now',
   'ai.unavailable.body': 'No AI key is configured on the server. The rest of welcomeRo works without it.',
-  'ai.unreachable.body': 'The AI service could not be reached. If you are running the app on your computer, start it with “vercel dev” so the /api route works. The rest of welcomeRo works without it.',
+  'ai.unreachable.body': 'The AI service could not be reached. If you are running the app on your computer, start it with “npm run dev” so the /api route works. The rest of welcomeRo works without it.',
   'ai.error': 'Something went wrong. Please try again.',
   'ai.rateLimited': 'Too many requests. Please wait a moment and try again.',
   'ai.newChat': 'New conversation',
@@ -358,6 +358,42 @@ export const en = {
   'auth.syncError': 'Your changes are saved in this browser, but cloud sync could not be completed.',
   'auth.navSignIn': 'Sign in',
   'auth.navAccount': 'Account',
+
+  // ---- voice & elevenlabs
+  'help.speech.elevenlabs': 'Natural Romanian voice active — tap Listen or Slow for instant pronunciation.',
+  'help.speech.voiceLabel': 'Voice style',
+  'help.speech.voice.warm': 'Warm & Clear',
+  'help.speech.voice.calm': 'Calm & Steady',
+  'help.speech.loading': 'Preparing audio…',
+
+  // ---- gemini document explainer & redirects
+  'ai.tab.chat': 'Ask a question',
+  'ai.tab.document': 'Explain a Romanian notice',
+  'ai.doc.title': 'Explain a Romanian letter, form, or notice',
+  'ai.doc.subtitle': 'Paste Romanian text or upload a photo/screenshot of a university email, lease clause, or office notice. Gemini translates and maps it to your next steps.',
+  'ai.doc.upload': 'Upload photo or screenshot',
+  'ai.doc.removeImage': 'Remove image',
+  'ai.doc.placeholder': 'Paste the Romanian text here, or ask what you want checked in the uploaded image…',
+  'ai.doc.submit': 'Explain notice',
+  'ai.doc.result': 'Plain-language explanation',
+  'ai.doc.privacy': 'Crop out or hide passport numbers, CNP, IBAN, and personal addresses before uploading.',
+  'ai.doc.invalidImage': 'Please upload a PNG, JPEG, or WebP image under 3.5 MB.',
+  'ai.action.openPage': 'Open {path}',
+
+  // ---- official source monitor
+  'monitor.title': 'Official source monitor',
+  'monitor.subtitle': 'Automatically checks only allowlisted official government, EU, and university websites from our sources list for changes.',
+  'monitor.checkNow': 'Check official sites now',
+  'monitor.checking': 'Checking official sites…',
+  'monitor.lastChecked': 'Last sweep: {date}',
+  'monitor.never': 'Waiting for first check',
+  'monitor.status.verified_unchanged': 'Online · matches baseline',
+  'monitor.status.updated': 'Update detected',
+  'monitor.status.unreachable': 'Could not reach right now',
+  'monitor.status.pending': 'Not checked yet',
+  'monitor.updatesTitle': 'Recently detected updates on official sites',
+  'monitor.noUpdates': 'All checked official sites match our saved baseline.',
+  'monitor.viewSources': 'Show source statuses ({count})',
 
   // ---- misc
   'nf.title': 'Page not found',

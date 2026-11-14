@@ -199,7 +199,7 @@ export function GuideDetail() {
         {institution ? (
           <p className="text-sm">
             <span className="font-semibold">{t('guide.institution')}:</span>{' '}
-            <Link to="/institutions" className={linkClass}>
+            <Link to={`/institutions?focus=${encodeURIComponent(institution.id)}`} className={linkClass}>
               {loc(institution.name)}
             </Link>
             {institution.address ? ` — ${institution.address}` : ''}
