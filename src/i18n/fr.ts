@@ -340,6 +340,8 @@ export const fr: Record<MessageKey, string> = {
   'auth.syncing': 'Synchronisation…',
   'auth.synced': 'Enregistré sur votre compte',
   'auth.error': 'La connexion avec Google n’a pas pu aboutir. Autorisez les fenêtres contextuelles et réessayez.',
+  'auth.error.domain': 'La connexion Google n’est pas autorisée pour « {domain} ». Ouvrez http://localhost:3000 ou ajoutez ce domaine dans Firebase Authentication → Domaines autorisés.',
+  'auth.error.generic': 'La connexion avec Google n’a pas pu aboutir. Consultez la console du navigateur pour plus de détails et réessayez.',
   'auth.syncError': 'Vos modifications sont enregistrées dans ce navigateur, mais la synchronisation cloud a échoué.',
   'auth.navSignIn': 'Connexion',
   'auth.navAccount': 'Compte',

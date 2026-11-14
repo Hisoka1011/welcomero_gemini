@@ -340,6 +340,8 @@ export const ro: Record<MessageKey, string> = {
   'auth.syncing': 'Se sincronizează modificările…',
   'auth.synced': 'Salvat în contul tău',
   'auth.error': 'Conectarea cu Google nu a putut fi finalizată. Permite ferestrele pop-up și încearcă din nou.',
+  'auth.error.domain': 'Conectarea cu Google nu este autorizată pentru „{domain}”. Deschide http://localhost:3000 sau adaugă acest domeniu în Firebase Authentication → Authorized domains.',
+  'auth.error.generic': 'Conectarea cu Google nu a putut fi finalizată. Verifică consola browserului pentru detalii și încearcă din nou.',
   'auth.syncError': 'Modificările sunt salvate în acest browser, dar sincronizarea în cloud nu a putut fi finalizată.',
   'auth.navSignIn': 'Conectare',
   'auth.navAccount': 'Cont',

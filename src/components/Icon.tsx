@@ -1,6 +1,6 @@
 // One small icon set (24x24 outline paths in the style of Lucide, MIT licence), so icons look consistent
 // and are not emoji. Icons are decorative: the text next to them carries the meaning.
-const PATHS = {
+export const ICON_PATHS = {
   check: 'M20 6 9 17l-5-5',
   list: 'm3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8',
   book: 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z',
@@ -32,7 +32,7 @@ const PATHS = {
   medical: 'M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4M22 10a2 2 0 1 0-4 0 2 2 0 0 0 4 0z',
 } as const;
 
-export type IconName = keyof typeof PATHS;
+export type IconName = keyof typeof ICON_PATHS;
 
 export function Icon({ name, className = 'size-5', flip = false }: { name: IconName; className?: string; flip?: boolean }) {
   return (
@@ -47,7 +47,7 @@ export function Icon({ name, className = 'size-5', flip = false }: { name: IconN
       focusable="false"
       className={`${className} shrink-0 ${flip ? 'rtl:-scale-x-100' : ''}`}
     >
-      <path d={PATHS[name]} />
+      <path d={ICON_PATHS[name]} />
     </svg>
   );
 }

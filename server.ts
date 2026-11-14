@@ -2,7 +2,6 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { GET as handleChatGet, POST as handleChatPost } from './api/chat';
-import { GET as handleInstitutionsMapGet } from './api/institutions-map';
 
 for (const envFile of ['.env.local', '.env']) {
   if (existsSync(envFile)) {
@@ -12,10 +11,6 @@ for (const envFile of ['.env.local', '.env']) {
       // Ignore unreadable env files
     }
   }
-}
-
-if (!process.env.VITE_GOOGLE_MAPS_API_KEY && process.env.GOOGLE_MAPS_API_KEY) {
-  process.env.VITE_GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -126,23 +121,6 @@ async function start(): Promise<void> {
       return;
     }
 
-    if (pathname === '/api/institutions-map' && req.method === 'GET') {
-      void handleInstitutionsMapGet()
-        .then(async (webRes) => {
-          res.statusCode = webRes.status;
-          webRes.headers.forEach((value, key) => {
-            res.setHeader(key, value);
-          });
-          res.end(Buffer.from(await webRes.arrayBuffer()));
-        })
-        .catch((err) => {
-          res.statusCode = 500;
-          res.setHeader('content-type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'internal_error' }));
-        });
-      return;
-    }
-
     if (vite) {
       vite.middlewares(req, res);
     } else {
@@ -151,7 +129,7 @@ async function start(): Promise<void> {
   });
 
   server.listen(port, '0.0.0.0', () => {
-    console.log(`welcomeRo server listening on http://0.0.0.0:${port}`);
+    console.log(`welcomeRo server listening on http://localhost:${port}`);
   });
 }
 

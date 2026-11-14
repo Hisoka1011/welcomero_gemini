@@ -41,7 +41,11 @@ export function Settings() {
         {authError ? (
           <div className="mt-3">
             <Notice role="alert" tone="error">
-              {t('auth.error')}
+              {authError === 'unauthorized-domain'
+                ? t('auth.error.domain', { domain: typeof window !== 'undefined' ? window.location.hostname : 'localhost' })
+                : authError === 'popup-blocked'
+                  ? t('auth.error')
+                  : t('auth.error.generic')}
             </Notice>
           </div>
         ) : null}

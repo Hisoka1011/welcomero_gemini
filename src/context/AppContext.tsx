@@ -27,6 +27,8 @@ export interface AuthUser {
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
+export type AuthErrorKind = 'popup-blocked' | 'unauthorized-domain' | 'generic';
+
 interface AppContextValue {
   language: Lang;
   setLanguage: (lang: Lang) => void;
@@ -47,7 +49,7 @@ interface AppContextValue {
   user: AuthUser | null;
   authReady: boolean;
   authLoading: boolean;
-  authError: boolean;
+  authError: AuthErrorKind | null;
   syncStatus: SyncStatus;
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
@@ -88,7 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState<AuthErrorKind | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
 
   const stateRef = useRef<WorkspaceState>({ language, profile, progress, docs, dates });
@@ -145,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         photoURL: firebaseUser.photoURL,
       });
       setAuthReady(true);
-      setAuthError(false);
+      setAuthError(null);
       setSyncStatus('syncing');
 
       try {
@@ -277,13 +279,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     setAuthLoading(true);
-    setAuthError(false);
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
-      const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: unknown }).code : undefined;
-      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-        setAuthError(true);
+      const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: unknown }).code) : '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
+      console.error('[auth] Google sign-in failed:', code || error);
+      if (code === 'auth/unauthorized-domain') {
+        setAuthError('unauthorized-domain');
+      } else if (code === 'auth/popup-blocked') {
+        setAuthError('popup-blocked');
+      } else {
+        setAuthError('generic');
       }
     } finally {
       setAuthLoading(false);
@@ -292,11 +302,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOutUser = useCallback(async () => {
     setAuthLoading(true);
-    setAuthError(false);
+    setAuthError(null);
     try {
       await signOut(auth);
     } catch {
-      setAuthError(true);
+      setAuthError('generic');
     } finally {
       setAuthLoading(false);
     }

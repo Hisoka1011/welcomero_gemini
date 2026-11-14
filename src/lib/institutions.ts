@@ -9,6 +9,27 @@ export interface InstitutionVisual {
   badgeClass: string;
 }
 
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+export const TIMISOARA_CENTER: Coordinates = {
+  lat: 45.7557559,
+  lng: 21.2322208,
+};
+
+export const INSTITUTION_COORDS: Record<string, Coordinates> = {
+  'igi-timis': { lat: 45.7587313, lng: 21.2416431 },
+  'upt-iso': { lat: 45.7536393, lng: 21.2251614 },
+  'primaria-timisoara': { lat: 45.7511466, lng: 21.226586 },
+  'anaf-timis': { lat: 45.7585992, lng: 21.221698 },
+  cnas: { lat: 45.7411579, lng: 21.2182563 },
+  'logs-timisoara': { lat: 45.7556677, lng: 21.2069344 },
+  'uvt-dri': { lat: 45.7467047, lng: 21.229821 },
+  'umft-dri': { lat: 45.7572315, lng: 21.2365832 },
+};
+
 const DEFAULT_VISUAL: InstitutionVisual = {
   icon: 'building',
   shortKey: 'inst.short.primaria',
@@ -85,4 +106,8 @@ export const INSTITUTION_VISUALS: Record<string, InstitutionVisual> = {
 
 export function getInstitutionVisual(id: string): InstitutionVisual {
   return INSTITUTION_VISUALS[id] ?? DEFAULT_VISUAL;
+}
+
+export function getInstitutionCoords(id: string): Coordinates | null {
+  return INSTITUTION_COORDS[id] ?? null;
 }

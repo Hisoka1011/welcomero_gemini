@@ -340,6 +340,8 @@ export const ar: Record<MessageKey, string> = {
   'auth.syncing': 'جارٍ مزامنة التغييرات…',
   'auth.synced': 'تم الحفظ في حسابك',
   'auth.error': 'تعذّر إكمال تسجيل الدخول عبر Google. يرجى السماح بالنوافذ المنبثقة والمحاولة مرة أخرى.',
+  'auth.error.domain': 'تسجيل الدخول عبر Google غير مصرح به للنطاق «{domain}». افتح http://localhost:3000 أو أضف هذا النطاق في Firebase Authentication ← Authorized domains.',
+  'auth.error.generic': 'تعذّر إكمال تسجيل الدخول عبر Google. تحقق من وحدة تحكم المتصفح للتفاصيل وحاول مرة أخرى.',
   'auth.syncError': 'تم حفظ تغييراتك في هذا المتصفح، لكن تعذّرت المزامنة السحابية.',
   'auth.navSignIn': 'تسجيل الدخول',
   'auth.navAccount': 'الحساب',

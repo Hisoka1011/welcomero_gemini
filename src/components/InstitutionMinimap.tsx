@@ -1,441 +1,194 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  APILoadingStatus,
-  APIProvider,
-  AdvancedMarker,
-  AdvancedMarkerAnchorPoint,
-  InfoWindow,
-  Map as GoogleMap,
-  useAdvancedMarkerRef,
-  useApiLoadingStatus,
-  useMap,
-  useMapsLibrary,
-  type AdvancedMarkerProps,
-} from '@vis.gl/react-google-maps';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useI18n } from '../context/useI18n';
-import { getInstitutionVisual } from '../lib/institutions';
+import { getInstitutionCoords, getInstitutionVisual, TIMISOARA_CENTER, type Coordinates, type InstitutionVisual } from '../lib/institutions';
 import type { Institution } from '../types';
-import { Icon } from './Icon';
+import { Icon, ICON_PATHS, type IconName } from './Icon';
 import { cardClass, linkClass, Notice } from './ui';
-
-interface ResolvedLocation {
-  lat: number;
-  lng: number;
-  placeId: string | null;
-  formattedAddress: string | null;
-}
-
-interface MinimapApiResponse {
-  configured?: boolean;
-  locations?: Record<string, ResolvedLocation>;
-  cityCenter?: ResolvedLocation | null;
-  error?: string;
-  status?: string;
-}
-
-const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() ?? '';
-const ATTRIBUTION_IDS = ['gmp_mcp_codeassist_v1_aistudio'];
-const Z_INDEX_HOVER = 999;
-const Z_INDEX_SELECTED = 1000;
-
-function triggerQuotaExceeded() {
-  window.dispatchEvent(new CustomEvent('gmp-quota-exceeded'));
-}
 
 function mapsSearchUrl(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-interface AdvancedMarkerWithRefProps extends AdvancedMarkerProps {
-  onMarkerMount?: (marker: google.maps.marker.AdvancedMarkerElement) => void;
-  onMarkerSelect: (marker: google.maps.marker.AdvancedMarkerElement) => void;
+function createSvgElement(iconName: IconName, sizePx: number): SVGSVGElement {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.style.width = `${sizePx}px`;
+  svg.style.height = `${sizePx}px`;
+  svg.style.flexShrink = '0';
+
+  const path = document.createElementNS(svgNs, 'path');
+  path.setAttribute('d', ICON_PATHS[iconName]);
+  svg.appendChild(path);
+  return svg;
 }
 
-function AdvancedMarkerWithRef({
-  children,
-  onMarkerMount,
-  onMarkerSelect,
-  ...props
-}: AdvancedMarkerWithRefProps) {
-  const [markerRef, marker] = useAdvancedMarkerRef();
+function createPinElement(
+  visual: InstitutionVisual,
+  label: string,
+  isSelected: boolean,
+  isHovered: boolean,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.width = 'max-content';
+  wrapper.style.transform = `translate(-50%, -100%) scale(${isSelected ? 1.1 : isHovered ? 1.05 : 1})`;
+  wrapper.style.transition = 'transform 150ms ease';
+  wrapper.style.cursor = 'pointer';
 
-  useEffect(() => {
-    if (marker && onMarkerMount) onMarkerMount(marker);
-  }, [marker, onMarkerMount]);
+  const pill = document.createElement('div');
+  pill.style.display = 'flex';
+  pill.style.alignItems = 'center';
+  pill.style.gap = '6px';
+  pill.style.padding = '5px 10px';
+  pill.style.borderRadius = '9999px';
+  pill.style.border = '2px solid #ffffff';
+  pill.style.backgroundColor = visual.pinBg;
+  pill.style.color = '#ffffff';
+  pill.style.boxShadow = isSelected
+    ? '0 0 0 4px rgba(191, 219, 254, 0.95), 0 4px 10px rgba(15, 23, 42, 0.25)'
+    : '0 3px 8px rgba(15, 23, 42, 0.25)';
 
-  return (
-    <AdvancedMarker
-      ref={markerRef}
-      onClick={() => {
-        if (marker) onMarkerSelect(marker);
-      }}
-      {...props}
-    >
-      {children}
-    </AdvancedMarker>
-  );
+  pill.appendChild(createSvgElement(visual.icon, 15));
+
+  const text = document.createElement('span');
+  text.textContent = label;
+  text.style.maxWidth = '128px';
+  text.style.overflow = 'hidden';
+  text.style.textOverflow = 'ellipsis';
+  text.style.whiteSpace = 'nowrap';
+  text.style.fontSize = '12px';
+  text.style.fontWeight = '700';
+  text.style.lineHeight = '1';
+  pill.appendChild(text);
+
+  const tip = document.createElement('div');
+  tip.style.width = '10px';
+  tip.style.height = '10px';
+  tip.style.marginTop = '-6px';
+  tip.style.transform = 'rotate(45deg)';
+  tip.style.backgroundColor = visual.pinBg;
+  tip.style.borderRight = '2px solid #ffffff';
+  tip.style.borderBottom = '2px solid #ffffff';
+
+  wrapper.appendChild(pill);
+  wrapper.appendChild(tip);
+  return wrapper;
 }
 
-/**
- * Fallback geocoder via Maps JS Places API (New) if the server geocoding route
- * did not return coordinates for one or more verified addresses.
- */
-function PlacesAddressResolver({
-  institutions,
-  locations,
-  cityCenter,
-  loadingLocations,
-  onResolved,
-}: {
-  institutions: Institution[];
-  locations: Record<string, ResolvedLocation>;
-  cityCenter: ResolvedLocation | null;
-  loadingLocations: boolean;
-  onResolved: (next: Record<string, ResolvedLocation>, nextCityCenter: ResolvedLocation | null) => void;
-}) {
-  const placesLib = useMapsLibrary('places');
-  const attemptedRef = useRef(false);
-
-  useEffect(() => {
-    if (loadingLocations || !placesLib || attemptedRef.current) return;
-    const missing = institutions.filter((inst) => inst.address && !locations[inst.id]);
-    if (missing.length === 0 && cityCenter) return;
-    attemptedRef.current = true;
-
-    let cancelled = false;
-
-    async function resolveMissing() {
-      const additions: Record<string, ResolvedLocation> = {};
-      let resolvedCity = cityCenter;
-
-      for (const inst of missing) {
-        if (!inst.address) continue;
-        try {
-          const { places } = await placesLib!.Place.searchByText({
-            textQuery: inst.address,
-            fields: ['id', 'location', 'formattedAddress'],
-            region: 'RO',
-            maxResultCount: 1,
-          });
-          const match = places?.[0];
-          if (match?.location) {
-            additions[inst.id] = {
-              lat: match.location.lat(),
-              lng: match.location.lng(),
-              placeId: match.id ?? null,
-              formattedAddress: match.formattedAddress ?? inst.address,
-            };
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('OVER_QUERY_LIMIT') || msg.includes('429')) {
-            triggerQuotaExceeded();
-            break;
-          }
-        }
-      }
-
-      if (!resolvedCity) {
-        try {
-          const { places } = await placesLib!.Place.searchByText({
-            textQuery: 'Timișoara, Romania',
-            fields: ['id', 'location', 'formattedAddress'],
-            region: 'RO',
-            maxResultCount: 1,
-          });
-          const match = places?.[0];
-          if (match?.location) {
-            resolvedCity = {
-              lat: match.location.lat(),
-              lng: match.location.lng(),
-              placeId: match.id ?? null,
-              formattedAddress: match.formattedAddress ?? null,
-            };
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('OVER_QUERY_LIMIT') || msg.includes('429')) {
-            triggerQuotaExceeded();
-          }
-        }
-      }
-
-      if (!cancelled && (Object.keys(additions).length > 0 || resolvedCity !== cityCenter)) {
-        onResolved(additions, resolvedCity);
-      }
-    }
-
-    void resolveMissing();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadingLocations, placesLib, institutions, locations, cityCenter, onResolved]);
-
-  return null;
-}
-
-function MapViewportController({
-  mappedPositions,
-  selectedId,
-  locations,
-  fitTrigger,
-}: {
-  mappedPositions: Array<{ id: string; position: ResolvedLocation }>;
-  selectedId: string | null;
-  locations: Record<string, ResolvedLocation>;
-  fitTrigger: number;
-}) {
-  const map = useMap();
-  const hasFittedInitial = useRef(false);
-
-  const fitAll = useCallback(() => {
-    if (!map || mappedPositions.length === 0 || typeof google === 'undefined') return;
-    if (mappedPositions.length === 1) {
-      map.panTo({ lat: mappedPositions[0].position.lat, lng: mappedPositions[0].position.lng });
-      map.setZoom(15);
-      return;
-    }
-    const bounds = new google.maps.LatLngBounds();
-    for (const item of mappedPositions) {
-      bounds.extend({ lat: item.position.lat, lng: item.position.lng });
-    }
-    map.fitBounds(bounds, { top: 48, right: 48, bottom: 48, left: 48 });
-  }, [map, mappedPositions]);
-
-  useEffect(() => {
-    if (!map || mappedPositions.length === 0 || hasFittedInitial.current) return;
-    hasFittedInitial.current = true;
-    fitAll();
-  }, [map, mappedPositions, fitAll]);
-
-  useEffect(() => {
-    if (fitTrigger > 0) fitAll();
-  }, [fitTrigger, fitAll]);
-
-  useEffect(() => {
-    if (!map || !selectedId) return;
-    const pos = locations[selectedId];
-    if (!pos) return;
-    map.panTo({ lat: pos.lat, lng: pos.lng });
-    const currentZoom = map.getZoom() ?? 14;
-    if (currentZoom < 15) map.setZoom(15);
-  }, [map, selectedId, locations]);
-
-  return null;
-}
-
-function MinimapCanvas({
-  institutions,
-  locations,
-  cityCenter,
-  selectedId,
-  hoveredId,
-  fitTrigger,
-  loadingLocations,
-  onSelectInstitution,
-  onHoverInstitution,
+function createPopupElement({
+  name,
+  address,
+  visual,
+  mapsLabel,
+  viewCardLabel,
+  dir,
   onJumpToCard,
-  onResolvedLocations,
 }: {
-  institutions: Institution[];
-  locations: Record<string, ResolvedLocation>;
-  cityCenter: ResolvedLocation | null;
-  selectedId: string | null;
-  hoveredId: string | null;
-  fitTrigger: number;
-  loadingLocations: boolean;
-  onSelectInstitution: (id: string | null) => void;
-  onHoverInstitution: (id: string | null) => void;
-  onJumpToCard: (id: string) => void;
-  onResolvedLocations: (next: Record<string, ResolvedLocation>, nextCityCenter: ResolvedLocation | null) => void;
-}) {
-  const { t, loc } = useI18n();
-  const status = useApiLoadingStatus();
-  const [selectedMarker, setSelectedMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const [markerInstances, setMarkerInstances] = useState<Record<string, google.maps.marker.AdvancedMarkerElement>>({});
+  name: string;
+  address: string | null;
+  visual: InstitutionVisual;
+  mapsLabel: string;
+  viewCardLabel: string;
+  dir: string;
+  onJumpToCard: () => void;
+}): HTMLElement {
+  const root = document.createElement('div');
+  root.dir = dir;
+  root.style.minWidth = '210px';
+  root.style.maxWidth = '265px';
+  root.style.fontFamily = 'inherit';
 
-  const registerMarker = useCallback((id: string, marker: google.maps.marker.AdvancedMarkerElement) => {
-    setMarkerInstances((prev) => (prev[id] === marker ? prev : { ...prev, [id]: marker }));
-  }, []);
+  const header = document.createElement('div');
+  header.style.display = 'flex';
+  header.style.alignItems = 'flex-start';
+  header.style.gap = '8px';
 
-  useEffect(() => {
-    if (!selectedId) {
-      setSelectedMarker(null);
-      return;
-    }
-    const marker = markerInstances[selectedId] ?? null;
-    setSelectedMarker(marker);
-  }, [selectedId, markerInstances]);
+  const badge = document.createElement('span');
+  badge.style.display = 'inline-flex';
+  badge.style.alignItems = 'center';
+  badge.style.justifyContent = 'center';
+  badge.style.width = '28px';
+  badge.style.height = '28px';
+  badge.style.marginTop = '2px';
+  badge.style.borderRadius = '8px';
+  badge.style.backgroundColor = visual.pinBg;
+  badge.style.color = '#ffffff';
+  badge.style.flexShrink = '0';
+  badge.appendChild(createSvgElement(visual.icon, 15));
 
-  const mappedInstitutions = useMemo(() => {
-    const items = institutions
-      .map((inst) => {
-        const position = locations[inst.id];
-        return position ? { inst, position } : null;
-      })
-      .filter((entry): entry is { inst: Institution; position: ResolvedLocation } => entry !== null);
+  const titleWrap = document.createElement('div');
+  titleWrap.style.minWidth = '0';
 
-    // Sort descending by latitude so southern markers render cleanly in front of northern ones.
-    return items
-      .sort((a, b) => b.position.lat - a.position.lat)
-      .map((entry, index) => ({ ...entry, baseZIndex: index + 1 }));
-  }, [institutions, locations]);
+  const titleEl = document.createElement('h3');
+  titleEl.textContent = name;
+  titleEl.style.margin = '0';
+  titleEl.style.fontSize = '13px';
+  titleEl.style.fontWeight = '700';
+  titleEl.style.lineHeight = '1.35';
+  titleEl.style.color = '#0a3350';
+  titleWrap.appendChild(titleEl);
 
-  const initialCenter = useMemo(() => {
-    if (mappedInstitutions.length > 0) {
-      return { lat: mappedInstitutions[0].position.lat, lng: mappedInstitutions[0].position.lng };
-    }
-    if (cityCenter) {
-      return { lat: cityCenter.lat, lng: cityCenter.lng };
-    }
-    return null;
-  }, [mappedInstitutions, cityCenter]);
-
-  const selectedInstitution = useMemo(
-    () => (selectedId ? institutions.find((i) => i.id === selectedId) ?? null : null),
-    [institutions, selectedId],
-  );
-
-  if (status === APILoadingStatus.FAILED || status === APILoadingStatus.AUTH_FAILURE) {
-    return (
-      <Notice tone="warning" role="status">
-        {t('inst.minimap.unavailable')}
-      </Notice>
-    );
+  if (address) {
+    const addrEl = document.createElement('p');
+    addrEl.textContent = address;
+    addrEl.style.margin = '3px 0 0';
+    addrEl.style.fontSize = '12px';
+    addrEl.style.color = '#475569';
+    titleWrap.appendChild(addrEl);
   }
 
-  return (
-    <div className="relative h-[340px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:h-[380px]">
-      <PlacesAddressResolver
-        institutions={institutions}
-        locations={locations}
-        cityCenter={cityCenter}
-        loadingLocations={loadingLocations}
-        onResolved={onResolvedLocations}
-      />
+  header.appendChild(badge);
+  header.appendChild(titleWrap);
+  root.appendChild(header);
 
-      {!initialCenter ? (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted">
-          <div className="skeleton h-8 w-8 rounded-full" aria-hidden="true" />
-          <p>{loadingLocations ? t('inst.minimap.loading') : t('inst.minimap.unavailable')}</p>
-        </div>
-      ) : (
-        <GoogleMap
-          mapId="DEMO_MAP_ID"
-          defaultCenter={initialCenter}
-          defaultZoom={14}
-          gestureHandling="cooperative"
-          mapTypeControl={false}
-          streetViewControl={false}
-          fullscreenControl={true}
-          internalUsageAttributionIds={ATTRIBUTION_IDS}
-          style={{ width: '100%', height: '100%' }}
-          onClick={() => onSelectInstitution(null)}
-        >
-          <MapViewportController
-            mappedPositions={mappedInstitutions.map(({ inst, position }) => ({ id: inst.id, position }))}
-            selectedId={selectedId}
-            locations={locations}
-            fitTrigger={fitTrigger}
-          />
+  const actions = document.createElement('div');
+  actions.style.display = 'flex';
+  actions.style.flexWrap = 'wrap';
+  actions.style.gap = '12px';
+  actions.style.marginTop = '10px';
+  actions.style.fontSize = '12px';
 
-          {mappedInstitutions.map(({ inst, position, baseZIndex }) => {
-            const visual = getInstitutionVisual(inst.id);
-            const isSelected = selectedId === inst.id;
-            const isHovered = hoveredId === inst.id;
-            const zIndex = isSelected ? Z_INDEX_SELECTED : isHovered ? Z_INDEX_HOVER : baseZIndex;
+  if (address) {
+    const mapsLink = document.createElement('a');
+    mapsLink.href = mapsSearchUrl(address);
+    mapsLink.target = '_blank';
+    mapsLink.rel = 'noreferrer noopener';
+    mapsLink.textContent = mapsLabel;
+    mapsLink.style.fontWeight = '600';
+    mapsLink.style.color = '#0b5a86';
+    mapsLink.style.textDecoration = 'underline';
+    actions.appendChild(mapsLink);
+  }
 
-            return (
-              <AdvancedMarkerWithRef
-                key={inst.id}
-                position={{ lat: position.lat, lng: position.lng }}
-                title={loc(inst.name)}
-                zIndex={zIndex}
-                anchorPoint={AdvancedMarkerAnchorPoint.BOTTOM}
-                onMouseEnter={() => onHoverInstitution(inst.id)}
-                onMouseLeave={() => onHoverInstitution(null)}
-                onMarkerMount={(marker) => registerMarker(inst.id, marker)}
-                onMarkerSelect={(marker) => {
-                  registerMarker(inst.id, marker);
-                  onSelectInstitution(inst.id);
-                }}
-              >
-                <div
-                  className={`group flex flex-col items-center transition-transform duration-150 ${
-                    isSelected ? 'scale-110' : isHovered ? 'scale-105' : ''
-                  }`}
-                >
-                  <div
-                    className={`flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1.5 text-white shadow-md ${
-                      isSelected ? 'ring-4 ring-brand-200' : ''
-                    }`}
-                    style={{ backgroundColor: visual.pinBg, borderColor: '#ffffff' }}
-                  >
-                    <Icon name={visual.icon} className="size-4" />
-                    <span className="max-w-[8rem] truncate text-xs font-bold leading-none">
-                      {t(visual.shortKey)}
-                    </span>
-                  </div>
-                  <div
-                    className="h-2.5 w-2.5 -mt-1.5 rotate-45 border-r-2 border-b-2 border-white"
-                    style={{ backgroundColor: visual.pinBg }}
-                    aria-hidden="true"
-                  />
-                </div>
-              </AdvancedMarkerWithRef>
-            );
-          })}
+  const cardBtn = document.createElement('button');
+  cardBtn.type = 'button';
+  cardBtn.textContent = viewCardLabel;
+  cardBtn.style.background = 'none';
+  cardBtn.style.border = 'none';
+  cardBtn.style.padding = '0';
+  cardBtn.style.cursor = 'pointer';
+  cardBtn.style.fontWeight = '600';
+  cardBtn.style.color = '#0b5a86';
+  cardBtn.style.textDecoration = 'underline';
+  cardBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onJumpToCard();
+  });
+  actions.appendChild(cardBtn);
 
-          {selectedInstitution && selectedMarker && locations[selectedInstitution.id] ? (
-            <InfoWindow
-              anchor={selectedMarker}
-              pixelOffset={[0, -8]}
-              maxWidth={290}
-              onCloseClick={() => onSelectInstitution(null)}
-            >
-              <div className="space-y-2 p-1 text-ink">
-                <div className="flex items-start gap-2">
-                  <span
-                    className={`mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg border ${getInstitutionVisual(selectedInstitution.id).badgeClass}`}
-                  >
-                    <Icon name={getInstitutionVisual(selectedInstitution.id).icon} className="size-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold leading-snug text-brand-900">
-                      {loc(selectedInstitution.name)}
-                    </h3>
-                    {selectedInstitution.address ? (
-                      <p className="mt-0.5 text-xs text-muted">{selectedInstitution.address}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
-                  {selectedInstitution.address ? (
-                    <a
-                      href={mapsSearchUrl(selectedInstitution.address)}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className={linkClass}
-                    >
-                      {t('inst.maps')}
-                    </a>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => onJumpToCard(selectedInstitution.id)}
-                    className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-900"
-                  >
-                    {t('inst.minimap.viewDetails')}
-                  </button>
-                </div>
-              </div>
-            </InfoWindow>
-          ) : null}
-        </GoogleMap>
-      )}
-    </div>
-  );
+  root.appendChild(actions);
+  return root;
 }
 
 export function InstitutionMinimap({
@@ -450,61 +203,172 @@ export function InstitutionMinimap({
   onJumpToCard: (id: string) => void;
 }) {
   const { t, loc, lang } = useI18n();
-  const [locations, setLocations] = useState<Record<string, ResolvedLocation>>({});
-  const [cityCenter, setCityCenter] = useState<ResolvedLocation | null>(null);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [fitTrigger, setFitTrigger] = useState(0);
+  const [tileError, setTileError] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadLocations() {
-      setLoadingLocations(true);
-      try {
-        const res = await fetch('/api/institutions-map');
-        const data = (await res.json().catch(() => null)) as MinimapApiResponse | null;
-        if (res.status === 429 || data?.status === 'RESOURCE_EXHAUSTED' || data?.error === 'quota_exceeded') {
-          triggerQuotaExceeded();
-        }
-        if (!cancelled && res.ok && data) {
-          if (data.locations) setLocations(data.locations);
-          if (data.cityCenter) setCityCenter(data.cityCenter);
-        }
-      } catch {
-        // Fallback to client-side Places API resolution inside APIProvider
-      } finally {
-        if (!cancelled) setLoadingLocations(false);
-      }
-    }
-
-    void loadLocations();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleResolvedLocations = useCallback(
-    (additions: Record<string, ResolvedLocation>, nextCityCenter: ResolvedLocation | null) => {
-      if (Object.keys(additions).length > 0) {
-        setLocations((prev) => ({ ...prev, ...additions }));
-      }
-      if (nextCityCenter) {
-        setCityCenter((prev) => prev ?? nextCityCenter);
-      }
-    },
-    [],
-  );
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<Record<string, L.Marker>>({});
+  const onSelectRef = useRef(onSelectInstitution);
+  const onJumpRef = useRef(onJumpToCard);
+  onSelectRef.current = onSelectInstitution;
+  onJumpRef.current = onJumpToCard;
 
   const mapInstitutions = useMemo(
     () => institutions.filter((inst) => !inst.placeholder),
     [institutions],
   );
 
+  const mappedInstitutions = useMemo(() => {
+    const items = mapInstitutions
+      .map((inst) => {
+        const coords = getInstitutionCoords(inst.id);
+        return inst.address && coords ? { inst, coords } : null;
+      })
+      .filter((entry): entry is { inst: Institution; coords: Coordinates } => entry !== null);
+
+    // Sort descending by latitude so southern pins render slightly in front of northern pins.
+    return items.sort((a, b) => b.coords.lat - a.coords.lat);
+  }, [mapInstitutions]);
+
   const unverifiedInstitutions = useMemo(
-    () => mapInstitutions.filter((inst) => !inst.address),
+    () => mapInstitutions.filter((inst) => !inst.address || !getInstitutionCoords(inst.id)),
     [mapInstitutions],
   );
+
+  function fitAllMarkers() {
+    const map = mapInstanceRef.current;
+    if (!map || mappedInstitutions.length === 0) return;
+    if (mappedInstitutions.length === 1) {
+      const { coords } = mappedInstitutions[0];
+      map.setView([coords.lat, coords.lng], 15, { animate: true });
+      return;
+    }
+    const bounds = L.latLngBounds(mappedInstitutions.map(({ coords }) => [coords.lat, coords.lng] as [number, number]));
+    map.fitBounds(bounds, { padding: [46, 46], animate: true });
+  }
+
+  // Initialize Leaflet map once (100% free OpenStreetMap tiles, zero API key required).
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container || mapInstanceRef.current) return;
+
+    const map = L.map(container, {
+      center: [TIMISOARA_CENTER.lat, TIMISOARA_CENTER.lng],
+      zoom: 14,
+      scrollWheelZoom: false,
+    });
+
+    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    });
+
+    tiles.on('tileerror', () => {
+      setTileError(true);
+    });
+    tiles.on('tileload', () => {
+      setTileError(false);
+    });
+    tiles.addTo(map);
+
+    map.on('click', () => {
+      onSelectRef.current(null);
+    });
+
+    mapInstanceRef.current = map;
+
+    if (mappedInstitutions.length > 0) {
+      const bounds = L.latLngBounds(mappedInstitutions.map(({ coords }) => [coords.lat, coords.lng] as [number, number]));
+      map.fitBounds(bounds, { padding: [46, 46] });
+    }
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+      markersRef.current = {};
+    };
+    // Initialize map once on mount; bounds and markers synchronize below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Create/update institution markers when data, language, selection, or hover changes.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const dir = lang === 'ar' ? 'rtl' : 'ltr';
+    const nextIds = new Set(mappedInstitutions.map(({ inst }) => inst.id));
+
+    for (const [id, marker] of Object.entries(markersRef.current)) {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        delete markersRef.current[id];
+      }
+    }
+
+    mappedInstitutions.forEach(({ inst, coords }, index) => {
+      const visual = getInstitutionVisual(inst.id);
+      const isSelected = selectedId === inst.id;
+      const isHovered = hoveredId === inst.id;
+      const icon = L.divIcon({
+        html: createPinElement(visual, t(visual.shortKey), isSelected, isHovered),
+        className: 'bg-transparent border-0',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+        popupAnchor: [0, -38],
+      });
+
+      const popupEl = createPopupElement({
+        name: loc(inst.name),
+        address: inst.address,
+        visual,
+        mapsLabel: t('inst.maps'),
+        viewCardLabel: t('inst.minimap.viewDetails'),
+        dir,
+        onJumpToCard: () => onJumpRef.current(inst.id),
+      });
+
+      let marker = markersRef.current[inst.id];
+      if (!marker) {
+        marker = L.marker([coords.lat, coords.lng], {
+          icon,
+          title: loc(inst.name),
+          zIndexOffset: isSelected ? 1000 : isHovered ? 900 : index,
+        }).addTo(map);
+
+        marker.bindPopup(popupEl, { maxWidth: 280 });
+        marker.on('mouseover', () => setHoveredId(inst.id));
+        marker.on('mouseout', () => setHoveredId((prev) => (prev === inst.id ? null : prev)));
+        marker.on('click', () => {
+          onSelectRef.current(inst.id);
+        });
+        markersRef.current[inst.id] = marker;
+      } else {
+        marker.setIcon(icon);
+        marker.setZIndexOffset(isSelected ? 1000 : isHovered ? 900 : index);
+        marker.setPopupContent(popupEl);
+      }
+    });
+  }, [mappedInstitutions, selectedId, hoveredId, t, loc, lang]);
+
+  // Center map and open popup when an institution is selected.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!selectedId) {
+      map.closePopup();
+      return;
+    }
+
+    const marker = markersRef.current[selectedId];
+    const coords = getInstitutionCoords(selectedId);
+    if (!marker || !coords) return;
+
+    map.setView([coords.lat, coords.lng], Math.max(map.getZoom(), 15), { animate: true });
+    marker.openPopup();
+  }, [selectedId]);
 
   return (
     <section aria-labelledby="inst-minimap-title" className={`${cardClass} space-y-4`}>
@@ -520,7 +384,7 @@ export function InstitutionMinimap({
           type="button"
           onClick={() => {
             onSelectInstitution(null);
-            setFitTrigger((n) => n + 1);
+            fitAllMarkers();
           }}
           className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-brand-700 bg-white px-3 py-1.5 text-sm font-semibold text-brand-800 hover:bg-brand-50"
         >
@@ -533,7 +397,7 @@ export function InstitutionMinimap({
       <ul className="flex flex-wrap gap-2" aria-label={t('inst.minimap.title')}>
         {mapInstitutions.map((inst) => {
           const visual = getInstitutionVisual(inst.id);
-          const hasAddress = Boolean(inst.address);
+          const hasAddress = Boolean(inst.address && getInstitutionCoords(inst.id));
           const isSelected = selectedId === inst.id;
           return (
             <li key={inst.id}>
@@ -575,27 +439,16 @@ export function InstitutionMinimap({
         })}
       </ul>
 
-      {MAPS_API_KEY ? (
-        <APIProvider apiKey={MAPS_API_KEY} libraries={['marker', 'places']} language={lang} region="RO">
-          <MinimapCanvas
-            institutions={mapInstitutions}
-            locations={locations}
-            cityCenter={cityCenter}
-            selectedId={selectedId}
-            hoveredId={hoveredId}
-            fitTrigger={fitTrigger}
-            loadingLocations={loadingLocations}
-            onSelectInstitution={onSelectInstitution}
-            onHoverInstitution={setHoveredId}
-            onJumpToCard={onJumpToCard}
-            onResolvedLocations={handleResolvedLocations}
-          />
-        </APIProvider>
-      ) : (
+      {tileError ? (
         <Notice tone="warning" role="status">
           {t('inst.minimap.unavailable')}
         </Notice>
-      )}
+      ) : null}
+
+      <div
+        ref={mapContainerRef}
+        className="relative z-0 h-[340px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:h-[380px]"
+      />
 
       {unverifiedInstitutions.length > 0 ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">

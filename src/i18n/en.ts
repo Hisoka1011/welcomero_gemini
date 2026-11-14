@@ -353,6 +353,8 @@ export const en = {
   'auth.syncing': 'Syncing changes…',
   'auth.synced': 'Saved to your account',
   'auth.error': 'Could not complete Google sign-in. Please allow popups and try again.',
+  'auth.error.domain': 'Google sign-in is not authorized for “{domain}”. Open http://localhost:3000 or add this domain in Firebase Authentication → Authorized domains.',
+  'auth.error.generic': 'Could not complete Google sign-in. Check the browser console for details and try again.',
   'auth.syncError': 'Your changes are saved in this browser, but cloud sync could not be completed.',
   'auth.navSignIn': 'Sign in',
   'auth.navAccount': 'Account',

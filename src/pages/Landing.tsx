@@ -65,7 +65,11 @@ export function Landing() {
           {authError ? (
             <div className="mt-4 max-w-xl">
               <Notice role="alert" tone="error">
-                {t('auth.error')}
+                {authError === 'unauthorized-domain'
+                  ? t('auth.error.domain', { domain: typeof window !== 'undefined' ? window.location.hostname : 'localhost' })
+                  : authError === 'popup-blocked'
+                    ? t('auth.error')
+                    : t('auth.error.generic')}
               </Notice>
             </div>
           ) : null}
