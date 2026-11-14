@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
 import type { MessageKey } from '../i18n';
+import { Icon } from './Icon';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Logo } from './Logo';
 import { linkClass } from './ui';
@@ -24,7 +25,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 function Header() {
-  const { profile } = useApp();
+  const { profile, user, authReady, authLoading, signInWithGoogle } = useApp();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -47,6 +48,27 @@ function Header() {
         ) : null}
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
+          {authReady && user ? (
+            <Link
+              to="/settings"
+              aria-label={t('auth.navAccount')}
+              className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-brand-900 hover:bg-brand-50"
+            >
+              <Icon name="user" className="size-4 text-brand-700" />
+              <span className="hidden sm:inline">{user.displayName?.split(' ')[0] || t('auth.navAccount')}</span>
+            </Link>
+          ) : null}
+          {authReady && !user ? (
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              disabled={authLoading}
+              className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-700 bg-white px-3 text-sm font-semibold text-brand-800 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="user" className="size-4" />
+              <span>{authLoading ? t('auth.signingIn') : t('auth.navSignIn')}</span>
+            </button>
+          ) : null}
           {profile ? (
             <button
               type="button"

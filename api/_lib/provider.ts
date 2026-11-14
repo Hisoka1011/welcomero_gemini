@@ -1,5 +1,6 @@
 // AI provider layer. The rest of the server code only knows the `AiProvider` interface,
 // so switching to another model provider later means adding one object here and changing getProvider().
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -29,8 +30,8 @@ export class ProviderError extends Error {
 }
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const REQUEST_TIMEOUT_MS = 12_000;
 
 /** Sends one JSON request and turns every failure into a ProviderError with a safe, generic message. */
 
@@ -46,7 +47,7 @@ async function postJson(
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(35_000),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
     const timedOut =
@@ -91,16 +92,22 @@ function nonEmpty(text: string): string {
   return trimmed;
 }
 
+function readEnvKey(name: string): string {
+  const raw = process.env[name];
+  if (!raw) return "";
+  return raw.trim().replace(/^["']|["']$/g, "");
+}
+
 // ---- Anthropic (paid) ------------------------------------------------------------------------
 const anthropicProvider: AiProvider = {
   name: "anthropic",
 
   isConfigured() {
-    return Boolean(process.env.ANTHROPIC_API_KEY);
+    return Boolean(readEnvKey("ANTHROPIC_API_KEY"));
   },
 
   async complete({ system, messages, maxTokens }) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = readEnvKey("ANTHROPIC_API_KEY");
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
     const data = (await postJson(
       ANTHROPIC_URL,
@@ -128,43 +135,62 @@ const geminiProvider: AiProvider = {
   name: "gemini",
 
   isConfigured() {
-    return Boolean(process.env.GEMINI_API_KEY);
+    return Boolean(readEnvKey("GEMINI_API_KEY"));
   },
 
   async complete({ system, messages, maxTokens }) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = readEnvKey("GEMINI_API_KEY");
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
-    const model = process.env.GEMINI_MODEL || process.env.AI_MODEL || "gemini-2.5-flash";
-    const generationConfig: Record<string, unknown> = {
-      maxOutputTokens: maxTokens,
-      temperature: 0.3,
-    };
-    // Gemini 2.5 Flash "thinks" first and the thinking uses up the output budget; switch it off for short answers.
-    if (model.startsWith("gemini-2.5-flash"))
-      generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    const data = (await postJson(
-      `${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent`,
-      { "x-goog-api-key": apiKey }, // sent as a header, so the key never appears in a URL or log line
-      {
-        systemInstruction: { parts: [{ text: system }] },
+    const model = process.env.GEMINI_MODEL || process.env.AI_MODEL || "gemini-3.1-flash-lite";
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        timeout: REQUEST_TIMEOUT_MS,
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+
+    try {
+      const response = await ai.models.generateContent({
+        model,
         contents: messages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",
           parts: [{ text: m.content }],
         })),
-        generationConfig,
-      },
-    )) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
-      }>;
-    };
-    const parts = data.candidates?.[0]?.content?.parts ?? [];
-    return nonEmpty(
-      parts
-        .filter((part) => typeof part.text === "string" && !part.thought)
-        .map((part) => part.text)
-        .join(""),
-    );
+        config: {
+          systemInstruction: system,
+          maxOutputTokens: maxTokens,
+          ...(model.startsWith("gemini-3")
+            ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
+            : model.startsWith("gemini-4")
+              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+              : model.startsWith("gemini-2.5-flash")
+                ? { thinkingConfig: { thinkingBudget: 0 } }
+                : {}),
+          abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        },
+      });
+      return nonEmpty(response.text ?? "");
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      const timedOut =
+        error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError");
+      if (timedOut) {
+        throw new ProviderError("Request timed out", "timeout");
+      }
+      const status =
+        typeof (error as { status?: unknown })?.status === "number"
+          ? (error as { status: number }).status
+          : undefined;
+      const msg = error instanceof Error ? error.message : String(error);
+      if (status === 429 || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        throw new ProviderError(`HTTP 429: ${msg}`, "rate_limited");
+      }
+      throw new ProviderError(msg || "Upstream error", "upstream");
+    }
   },
 };
 
@@ -173,13 +199,18 @@ const groqProvider: AiProvider = {
   name: "groq",
 
   isConfigured() {
-    return Boolean(process.env.GROQ_API_KEY);
+    return Boolean(readEnvKey("GROQ_API_KEY"));
   },
 
   async complete({ system, messages, maxTokens }) {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = readEnvKey("GROQ_API_KEY");
     if (!apiKey) throw new ProviderError("Missing API key", "upstream");
-    const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+    const model =
+      process.env.GROQ_MODEL ||
+      (!readEnvKey("GEMINI_API_KEY") || process.env.AI_PROVIDER?.trim().toLowerCase() === "groq"
+        ? process.env.AI_MODEL
+        : undefined) ||
+      "openai/gpt-oss-20b";
     const body: Record<string, unknown> = {
       model,
       messages: [{ role: "system", content: system }, ...messages],

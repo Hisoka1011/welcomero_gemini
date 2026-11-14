@@ -89,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
       focusProcedure,
     }),
     messages,
-    maxTokens: mode === "phrase" ? 200 : 350,
+    maxTokens: mode === "phrase" ? 200 : 500,
   };
 
   let lastError: unknown;

@@ -121,5 +121,26 @@
     "kind": "eu",
     "retrieved": "2026-11-13",
     "note": "Describes the EU-wide registration after 3 months for family members. It does not cover Romanian rules for students."
+  },
+  "logs-home": {
+    "title": "Asociația LOGS – Grup de Inițiative Sociale (Casa LOGS Timișoara)",
+    "url": "https://grupullogs.ro/",
+    "kind": "ngo",
+    "retrieved": "2026-11-14",
+    "note": "Official NGO website listing Casa LOGS counseling center in Timișoara (Str. Țebea nr. 12), phone, and email."
+  },
+  "uvt-home": {
+    "title": "West University of Timișoara (UVT): Department of International Relations",
+    "url": "https://www.uvt.ro/",
+    "kind": "university",
+    "retrieved": "2026-11-14",
+    "note": "Official university website listing the main campus address at Bd. Vasile Pârvan nr. 4, 300223 Timișoara."
+  },
+  "umft-home": {
+    "title": "Victor Babeș University of Medicine and Pharmacy Timișoara (UMFT)",
+    "url": "https://www.umft.eu/",
+    "kind": "university",
+    "retrieved": "2026-11-14",
+    "note": "Official university website listing the main address at Piața Eftimie Murgu nr. 2, 300041 Timișoara."
   }
 }

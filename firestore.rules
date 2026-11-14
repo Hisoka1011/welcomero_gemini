@@ -1,0 +1,109 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidProfileMap(profile) {
+      return profile is map
+        && profile.keys().hasAll(['situation', 'citizenship', 'accommodation', 'completed'])
+        && profile.keys().hasOnly(['situation', 'citizenship', 'accommodation', 'completed'])
+        && profile.situation is string
+        && profile.situation in ['student', 'worker', 'refugee', 'other']
+        && profile.citizenship is string
+        && profile.citizenship in ['eu', 'non-eu']
+        && profile.accommodation is string
+        && profile.accommodation in ['registered', 'not-registered', 'none', 'unsure']
+        && profile.completed is list
+        && profile.completed.size() <= 10
+        && (profile.completed.size() == 0 || (
+          profile.completed[0] is string
+          && profile.completed.hasOnly(['residence', 'address', 'health', 'cnp', 'university', 'none', 'unsure'])
+        ));
+    }
+
+    function isValidDatesMap(dates) {
+      return dates is map
+        && dates.keys().hasAll(['arrival', 'expiry'])
+        && dates.keys().hasOnly(['arrival', 'expiry'])
+        && dates.arrival is string
+        && dates.arrival.size() <= 20
+        && dates.expiry is string
+        && dates.expiry.size() <= 20;
+    }
+
+    function isValidUserWorkspace(data) {
+      return data.keys().hasAll(['ownerId', 'language', 'hasProfile', 'progress', 'docs', 'dates', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'language', 'hasProfile', 'profile', 'progress', 'docs', 'dates', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.language is string
+        && data.language in ['en', 'ro', 'ar', 'fr']
+        && data.hasProfile is bool
+        && (
+          (data.hasProfile == true && ('profile' in data) && isValidProfileMap(data.profile))
+          || (data.hasProfile == false && !('profile' in data))
+        )
+        && data.progress is map
+        && data.progress.size() <= 50
+        && data.docs is map
+        && data.docs.size() <= 50
+        && isValidDatesMap(data.dates)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserWorkspace(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserWorkspace(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'language',
+          'hasProfile',
+          'profile',
+          'progress',
+          'docs',
+          'dates',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(userId) && isOwner(userId);
+    }
+  }
+}

@@ -178,17 +178,111 @@
     "services": [
       { "en": "Public health insurance information", "ro": "Informații despre asigurarea publică de sănătate", "fr": "Informations sur l’assurance maladie publique", "ar": "معلومات عن التأمين الصحي العام" }
     ],
-    "address": null,
+    "address": "Strada Corbului nr. 4, 300239 Timișoara",
     "phone": null,
     "email": null,
     "website": "https://cnas.ro/",
     "hours": null,
     "verifiedNote": {
-      "en": "Only the official website is listed. The address and phone of the Timiș county health insurance house were not verified. Start at cnas.ro.",
-      "ro": "Este listat doar site-ul oficial. Adresa și telefonul Casei de Asigurări de Sănătate Timiș nu au fost verificate. Începe de la cnas.ro.",
-      "fr": "Seul le site officiel est indiqué. L’adresse et le téléphone de la caisse d’assurance maladie de Timiș n’ont pas été vérifiés. Commencez par cnas.ro.",
-      "ar": "تم إدراج الموقع الرسمي فقط. لم يتم التحقق من عنوان وهاتف صندوق التأمين الصحي في تيميش. ابدأ من cnas.ro."
+      "en": "The address is for the Timiș County Health Insurance House (CJAS Timiș: Strada Corbului nr. 4, 300239 Timișoara). Phone, email, and opening hours were not verified. Start at cnas.ro.",
+      "ro": "Adresa aparține Casei Județene de Asigurări de Sănătate Timiș (Strada Corbului nr. 4, cod poștal 300239, Timișoara). Telefonul, e-mailul și programul nu au fost verificate. Începe de la cnas.ro.",
+      "fr": "L’adresse correspond à la Caisse départementale d’assurance maladie de Timiș (CJAS Timiș : Strada Corbului nr. 4, 300239 Timișoara). Le téléphone, l’e-mail et les horaires n’ont pas été vérifiés. Commencez par cnas.ro.",
+      "ar": "العنوان يعود لصندوق التأمين الصحي لمقاطعة تيميش (Strada Corbului nr. 4, 300239 Timișoara). لم يتم التحقق من الهاتف والبريد الإلكتروني وساعات العمل. ابدأ من cnas.ro."
     },
     "sourceIds": ["cnas-home"]
+  },
+  {
+    "id": "logs-timisoara",
+    "name": {
+      "en": "LOGS – Social Initiatives Group (Casa LOGS Timișoara)",
+      "ro": "Asociația LOGS – Grup de Inițiative Sociale (Casa LOGS Timișoara)",
+      "fr": "LOGS – Groupe d’initiatives sociales (Casa LOGS Timișoara)",
+      "ar": "جمعية LOGS – مجموعة المبادرات الاجتماعية (Casa LOGS تيميشوارا)"
+    },
+    "description": {
+      "en": "An NGO and newcomer day-counseling center in Timișoara offering free integration, legal guidance, and community support for migrants, refugees, and international newcomers.",
+      "ro": "Un ONG și centru de zi de consiliere din Timișoara care oferă sprijin gratuit pentru integrare, orientare administrativă și activități comunitare pentru migranți, refugiați și nou-veniți.",
+      "fr": "Une ONG et un centre de conseil de jour à Timișoara offrant un accompagnement gratuit à l’intégration, des conseils administratifs et des activités communautaires pour les nouveaux arrivants.",
+      "ar": "منظمة غير حكومية ومركز استشارات نهاري في تيميشوارا يقدم دعمًا مجانيًا للاندماج وتوجيهًا إداريًا وأنشطة مجتمعية للمهاجرين واللاجئين والوافدين الجدد."
+    },
+    "services": [
+      { "en": "Free social and integration counseling for newcomers and migrants", "ro": "Consiliere socială și sprijin gratuit pentru integrarea nou-veniților și migranților", "fr": "Conseil social et aide gratuite à l’intégration pour les nouveaux arrivants", "ar": "استشارات اجتماعية ودعم مجاني للاندماج للوافدين الجدد" },
+      { "en": "Guidance on residence, health insurance, housing, and employment", "ro": "Orientare privind șederea, asigurarea de sănătate, locuirea și angajarea", "fr": "Orientation pour le séjour, l’assurance maladie, le logement et l’emploi", "ar": "توجيه بشأن الإقامة والتأمين الصحي والسكن والعمل" },
+      { "en": "Romanian language classes and community activities at Casa LOGS", "ro": "Cursuri de limba română și activități comunitare la Casa LOGS", "fr": "Cours de roumain et activités communautaires à Casa LOGS", "ar": "دروس لغة رومانية وأنشطة مجتمعية في Casa LOGS" }
+    ],
+    "address": "Str. Țebea nr. 12, Timișoara",
+    "phone": "+40 783 001 667",
+    "email": "contact@grupullogs.ro",
+    "website": "https://grupullogs.ro/",
+    "hours": null,
+    "verifiedNote": {
+      "en": "Casa LOGS counseling center address, phone, and email are listed from grupullogs.ro. Opening hours vary by program; contact them in advance.",
+      "ro": "Adresa centrului de zi Casa LOGS, telefonul și e-mailul provin de pe grupullogs.ro. Programul depinde de activități; contactează-i înainte.",
+      "fr": "L’adresse de Casa LOGS, le téléphone et l’e-mail proviennent de grupullogs.ro. Les horaires varient selon les programmes ; contactez-les à l’avance.",
+      "ar": "العنوان والهاتف والبريد الإلكتروني لمركز Casa LOGS مأخوذة من grupullogs.ro. تختلف ساعات العمل حسب البرامج؛ تواصل معهم مسبقًا."
+    },
+    "sourceIds": ["logs-home"]
+  },
+  {
+    "id": "uvt-dri",
+    "name": {
+      "en": "West University of Timișoara (UVT): International Relations Office",
+      "ro": "Universitatea de Vest din Timișoara (UVT): Departamentul de Relații Internaționale",
+      "fr": "Université de l’Ouest de Timișoara (UVT) : Relations internationales",
+      "ar": "جامعة غرب تيميشوارا (UVT): مكتب العلاقات الدولية"
+    },
+    "description": {
+      "en": "Supports international degree and Erasmus+ students enrolled at West University of Timișoara with onboarding, documents, and orientation.",
+      "ro": "Sprijină studenții internaționali și Erasmus+ înscriși la Universitatea de Vest din Timișoara cu integrarea, actele și orientarea.",
+      "fr": "Accompagne les étudiants internationaux et Erasmus+ inscrits à l’Université de l’Ouest de Timișoara pour leur accueil et leurs démarches.",
+      "ar": "يدعم الطلاب الدوليين وطلاب إيراسموس+ المسجلين في جامعة غرب تيميشوارا في الإجراءات الأولية والمستندات والتوجيه."
+    },
+    "services": [
+      { "en": "Support for UVT international and Erasmus+ students", "ro": "Sprijin pentru studenții internaționali și Erasmus+ ai UVT", "fr": "Accompagnement des étudiants internationaux et Erasmus+ de l’UVT", "ar": "دعم الطلاب الدوليين وطلاب إيراسموس+ في UVT" },
+      { "en": "University arrival orientation and enrollment certificates", "ro": "Orientare la sosire și adeverințe universitare", "fr": "Orientation à l’arrivée et attestations universitaires", "ar": "التوجيه عند الوصول وإفادات القيد الجامعي" }
+    ],
+    "address": "Bd. Vasile Pârvan nr. 4, 300223 Timișoara",
+    "phone": null,
+    "email": null,
+    "website": "https://www.uvt.ro/",
+    "hours": null,
+    "verifiedNote": {
+      "en": "Main UVT building address (International Relations Office is in Room 155B, 1st floor). Phone, email, and office hours were not verified; check uvt.ro.",
+      "ro": "Adresa clădirii principale UVT (Biroul de Relații Internaționale este la etajul 1, sala 155B). Telefonul, e-mailul și programul nu au fost verificate; verifică pe uvt.ro.",
+      "fr": "Adresse du bâtiment principal de l’UVT (le bureau des relations internationales se trouve au 1er étage, salle 155B). Le téléphone, l’e-mail et les horaires n’ont pas été vérifiés ; consultez uvt.ro.",
+      "ar": "عنوان المبنى الرئيسي لجامعة UVT (يقع مكتب العلاقات الدولية في الطابق الأول، القاعة 155B). لم يتم التحقق من الهاتف والبريد وساعات العمل؛ راجع uvt.ro."
+    },
+    "sourceIds": ["uvt-home"]
+  },
+  {
+    "id": "umft-dri",
+    "name": {
+      "en": "Victor Babeș University of Medicine and Pharmacy (UMFT): International Office",
+      "ro": "Universitatea de Medicină și Farmacie „Victor Babeș” (UMFT): Relații Internaționale",
+      "fr": "Université de médecine et pharmacie « Victor Babeș » (UMFT) : Bureau international",
+      "ar": "جامعة فيكتور بابيش للطب والصيدلة (UMFT): المكتب الدولي"
+    },
+    "description": {
+      "en": "The main campus and international student relations hub for foreign students studying medicine, dentistry, or pharmacy in Timișoara.",
+      "ro": "Sediul central și departamentul pentru studenții internaționali care studiază medicina, medicina dentară sau farmacia în Timișoara.",
+      "fr": "Le campus principal et le service des relations internationales pour les étudiants étrangers en médecine, dentaire ou pharmacie à Timișoara.",
+      "ar": "الحرم الرئيسي ومكتب العلاقات الدولية للطلاب الأجانب الدارسين للطب أو طب الأسنان أو الصيدلة في تيميشوارا."
+    },
+    "services": [
+      { "en": "Support for international medical and pharmacy students", "ro": "Sprijin pentru studenții internaționali la medicină și farmacie", "fr": "Accompagnement des étudiants internationaux en médecine et pharmacie", "ar": "دعم طلاب الطب والصيدلة الدوليين" },
+      { "en": "Enrollment confirmation and study-visa documentation", "ro": "Confirmarea înscrierii și documente pentru viza/șederea de studii", "fr": "Confirmation d’inscription et documents pour le visa et le séjour d’études", "ar": "تأكيد التسجيل ومستندات تأشيرة وإقامة الدراسة" }
+    ],
+    "address": "Piața Eftimie Murgu nr. 2, 300041 Timișoara",
+    "phone": null,
+    "email": null,
+    "website": "https://www.umft.eu/",
+    "hours": null,
+    "verifiedNote": {
+      "en": "Main UMFT rectorate address at Piața Eftimie Murgu nr. 2. Direct phone, email, and counter hours should be checked on umft.eu before visiting.",
+      "ro": "Adresa rectoratului UMFT din Piața Eftimie Murgu nr. 2. Telefonul direct, e-mailul și programul ghișeului se verifică pe umft.eu înainte de vizită.",
+      "fr": "Adresse du rectorat de l’UMFT à Piața Eftimie Murgu nr. 2. Vérifiez le téléphone direct, l’e-mail et les horaires sur umft.eu avant de vous déplacer.",
+      "ar": "عنوان رئاسة جامعة UMFT في ساحة Eftimie Murgu رقم 2. يُرجى التحقق من الهاتف المباشر والبريد الإلكتروني وساعات العمل على umft.eu قبل الزيارة."
+    },
+    "sourceIds": ["umft-home"]
   }
 ]

@@ -40,7 +40,7 @@ export type Reliability = 'verified' | 'recommended' | 'confirm';
 export interface Source {
   title: string;
   url: string;
-  kind: 'government' | 'university' | 'eu';
+  kind: 'government' | 'university' | 'eu' | 'ngo';
   retrieved: string; // ISO date
   note?: string;
 }

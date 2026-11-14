@@ -1,11 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
+import { Icon } from '../components/Icon';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { btnPrimary, cardClass, inputClass, PageHeader } from '../components/ui';
+import { btnPrimary, btnSecondary, cardClass, inputClass, Notice, PageHeader } from '../components/ui';
 
 export function Settings() {
-  const { profile, resetAll } = useApp();
+  const {
+    profile,
+    resetAll,
+    user,
+    authReady,
+    authLoading,
+    authError,
+    syncStatus,
+    signInWithGoogle,
+    signOutUser,
+  } = useApp();
   const { t } = useI18n();
   const navigate = useNavigate();
 
@@ -18,6 +29,56 @@ export function Settings() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title={t('set.title')} />
+
+      <section className={cardClass} aria-labelledby="account-title">
+        <div className="flex items-center gap-2">
+          <Icon name="user" className="size-5 text-brand-700" />
+          <h2 id="account-title" className="text-lg font-bold text-brand-900">
+            {t('auth.title')}
+          </h2>
+        </div>
+
+        {authError ? (
+          <div className="mt-3">
+            <Notice role="alert" tone="error">
+              {t('auth.error')}
+            </Notice>
+          </div>
+        ) : null}
+
+        {user && syncStatus === 'error' ? (
+          <div className="mt-3">
+            <Notice role="status" tone="warning">
+              {t('auth.syncError')}
+            </Notice>
+          </div>
+        ) : null}
+
+        {user ? (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm text-muted">
+              {t('auth.signedIn.body', { account: user.email || user.displayName || user.uid })}
+            </p>
+            {syncStatus === 'syncing' ? <p className="text-xs font-medium text-brand-700">{t('auth.syncing')}</p> : null}
+            {syncStatus === 'synced' ? <p className="text-xs font-medium text-emerald-800">{t('auth.synced')}</p> : null}
+            <div>
+              <button type="button" onClick={signOutUser} disabled={authLoading} className={btnSecondary}>
+                {t('auth.signOut')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-4">
+            <p className="text-sm text-muted">{t('auth.signedOut.body')}</p>
+            <div>
+              <button type="button" onClick={signInWithGoogle} disabled={!authReady || authLoading} className={btnPrimary}>
+                <Icon name="user" className="size-4" />
+                {authLoading ? t('auth.signingIn') : t('auth.signIn')}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className={cardClass} aria-labelledby="answers-title">
         <h2 id="answers-title" className="text-lg font-bold text-brand-900">
@@ -71,7 +132,7 @@ export function Settings() {
         <h2 id="data-title" className="text-lg font-bold text-brand-900">
           {t('set.data.title')}
         </h2>
-        <p className="mt-2 text-muted">{t('set.data.body')}</p>
+        <p className="mt-2 text-muted">{user ? t('set.data.bodyCloud') : t('set.data.body')}</p>
         <div className="mt-4">
           <button
             type="button"

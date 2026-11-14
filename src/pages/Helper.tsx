@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
 import { phrases } from '../data';
@@ -65,6 +65,7 @@ function CustomMessage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<GeneratedPhrase | null>(null);
   const [error, setError] = useState<MessageKey | null>(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +80,8 @@ function CustomMessage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const text = description.trim();
-    if (!text || busy) return;
+    if (!text || busy || inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -90,6 +92,7 @@ function CustomMessage() {
       if (code === 'not_configured' || code === 'unreachable') setAvailability(code);
       else setError(code === 'rate_limited' ? 'ai.rateLimited' : 'help.custom.error');
     } finally {
+      inFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -121,7 +124,8 @@ function CustomMessage() {
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t('help.custom.placeholder')}
-            className={`${inputClass} resize-y`}
+            disabled={busy}
+            className={`${inputClass} resize-y disabled:bg-slate-100`}
           />
           <button type="submit" className={btnPrimary} disabled={busy || description.trim() === ''}>
             {busy ? t('ai.thinking') : t('help.custom.generate')}

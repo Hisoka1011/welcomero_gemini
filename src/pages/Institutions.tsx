@@ -1,5 +1,9 @@
+import { useCallback, useState } from 'react';
 import { useI18n } from '../context/useI18n';
 import { institutions } from '../data';
+import { getInstitutionVisual } from '../lib/institutions';
+import { Icon } from '../components/Icon';
+import { InstitutionMinimap } from '../components/InstitutionMinimap';
 import { cardClass, linkClass, Notice, PageHeader } from '../components/ui';
 import type { Institution } from '../types';
 
@@ -16,16 +20,30 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function InstitutionCard({ institution }: { institution: Institution }) {
+function InstitutionCard({ institution, selected }: { institution: Institution; selected: boolean }) {
   const { t, loc } = useI18n();
   const missing = <span className="text-muted">{t('inst.notVerified')}</span>;
+  const visual = getInstitutionVisual(institution.id);
 
   return (
-    <article className={cardClass} aria-labelledby={`inst-${institution.id}`}>
+    <article
+      id={`inst-card-${institution.id}`}
+      className={`${cardClass} scroll-mt-20 transition-shadow ${
+        selected ? 'border-brand-600 ring-2 ring-brand-200' : ''
+      }`}
+      aria-labelledby={`inst-${institution.id}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 id={`inst-${institution.id}`} className="text-lg font-bold text-brand-900">
-          {loc(institution.name)}
-        </h2>
+        <div className="flex items-start gap-3">
+          <span
+            className={`mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-xl border ${visual.badgeClass}`}
+          >
+            <Icon name={visual.icon} className="size-5" />
+          </span>
+          <h2 id={`inst-${institution.id}`} className="text-lg font-bold text-brand-900">
+            {loc(institution.name)}
+          </h2>
+        </div>
         {institution.placeholder ? (
           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">{t('inst.example')}</span>
         ) : null}
@@ -85,13 +103,31 @@ function InstitutionCard({ institution }: { institution: Institution }) {
 
 export function Institutions() {
   const { t } = useI18n();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleJumpToCard = useCallback((id: string) => {
+    setSelectedId(id);
+    const el = document.getElementById(`inst-card-${id}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader title={t('inst.title')} subtitle={t('inst.subtitle')} />
       <Notice>{t('inst.mapNote')}</Notice>
+      <InstitutionMinimap
+        institutions={institutions}
+        selectedId={selectedId}
+        onSelectInstitution={setSelectedId}
+        onJumpToCard={handleJumpToCard}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         {institutions.map((institution) => (
-          <InstitutionCard key={institution.id} institution={institution} />
+          <InstitutionCard
+            key={institution.id}
+            institution={institution}
+            selected={selectedId === institution.id}
+          />
         ))}
       </div>
     </div>

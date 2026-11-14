@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
 import { getProcedure } from '../data';
@@ -9,6 +9,62 @@ import { btnPrimary, btnSecondary, inputClass, Notice, PageHeader } from '../com
 import type { MessageKey } from '../i18n';
 
 const EXAMPLES: MessageKey[] = ['ai.ex.1', 'ai.ex.2', 'ai.ex.3', 'ai.ex.4', 'ai.ex.5'];
+
+const LINK_TOKEN_RE =
+  /(https:\/\/[^\s<>()]+|\/(?:dashboard|checklist|guides(?:\/[a-z0-9-]+)?|plan|kit\/[a-z0-9-]+|institutions|helper|settings)\b)/g;
+
+function splitTrailingPunctuation(token: string): { target: string; trailing: string } {
+  const match = token.match(/^(.+?)([.,;:!?)\]]*)$/);
+  if (!match) return { target: token, trailing: '' };
+  return { target: match[1], trailing: match[2] };
+}
+
+function renderMessageContent(content: string) {
+  const parts: Array<string | { target: string; key: number }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  LINK_TOKEN_RE.lastIndex = 0;
+
+  while ((match = LINK_TOKEN_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+    const { target, trailing } = splitTrailingPunctuation(match[0]);
+    parts.push({ target, key: match.index });
+    if (trailing) parts.push(trailing);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return parts.map((part, idx) => {
+    if (typeof part === 'string') return <Fragment key={idx}>{part}</Fragment>;
+    if (part.target.startsWith('/')) {
+      return (
+        <Link
+          key={part.key}
+          to={part.target}
+          className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-900"
+        >
+          {part.target}
+        </Link>
+      );
+    }
+    return (
+      <a
+        key={part.key}
+        href={part.target}
+        target="_blank"
+        rel="noreferrer noopener"
+        dir="ltr"
+        className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-900"
+      >
+        {part.target}
+      </a>
+    );
+  });
+}
 
 function loadHistory(): ChatMessage[] {
   const stored = sessionData.read<unknown>(STORAGE_KEYS.chat, []);
@@ -33,6 +89,7 @@ export function Assistant() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +109,8 @@ export function Assistant() {
 
   async function ask(text: string) {
     const question = text.trim();
-    if (!question || busy) return;
+    if (!question || busy || inFlightRef.current) return;
+    inFlightRef.current = true;
     const next: ChatMessage[] = [...messages, { role: 'user', content: question }];
     setMessages(next);
     setInput('');
@@ -67,6 +125,7 @@ export function Assistant() {
       else if (code === 'unreachable') setAvailability('unreachable');
       else setError(code === 'rate_limited' ? 'ai.rateLimited' : 'ai.error');
     } finally {
+      inFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -116,7 +175,7 @@ export function Assistant() {
                 }`}
               >
                 <p className="mb-1 text-xs font-semibold opacity-80">{message.role === 'user' ? t('ai.you') : t('ai.assistant')}</p>
-                {message.content}
+                {message.role === 'assistant' ? renderMessageContent(message.content) : message.content}
               </div>
             </div>
           ))}
@@ -153,7 +212,7 @@ export function Assistant() {
               }
             }}
             placeholder={t('ai.placeholder')}
-            disabled={unavailable}
+            disabled={unavailable || busy}
             className={`${inputClass} flex-1 resize-y disabled:bg-slate-100`}
           />
           <button type="submit" className={btnPrimary} disabled={unavailable || busy || input.trim() === ''}>
@@ -163,7 +222,7 @@ export function Assistant() {
 
         {messages.length > 0 ? (
           <div className="mt-3">
-            <button type="button" className={btnSecondary} onClick={newConversation}>
+            <button type="button" className={btnSecondary} disabled={busy} onClick={newConversation}>
               {t('ai.newChat')}
             </button>
           </div>

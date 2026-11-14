@@ -104,6 +104,20 @@ export function buildKnowledge(): string {
     );
   }
 
+  parts.push(
+    [
+      '=== WELCOMERO APP PAGES (use these exact paths when sending the user to a page in the app) ===',
+      '- /dashboard : Home overview and next steps',
+      '- /checklist : Personalized step-by-step checklist based on citizenship and status',
+      '- /guides : All procedure guides (specific guide: /guides/<procedure-id>, e.g. /guides/residence-permit-student)',
+      '- /plan : Personal timeline planner with dates and calendar (.ics) export',
+      '- /kit/<procedure-id> : Printable appointment kit and Romanian phrases for a specific procedure',
+      '- /institutions : Directory and interactive Timișoara minimap of offices (IGI, UPT, City Hall, ANAF, CNAS)',
+      '- /helper : Spoken Romanian phrases and custom Romanian message generator',
+      '- /settings : Update profile (student/worker, EU/non-EU, accommodation) and language',
+    ].join('\n'),
+  );
+
   cached = parts.join('\n\n');
   return cached;
 }

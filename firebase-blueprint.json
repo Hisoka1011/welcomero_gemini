@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Per-user welcomeRo preferences, onboarding profile, checklist progress, document ticks, and arrival plan dates.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Authenticated Firebase UID owning this workspace document."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "ro", "ar", "fr"],
+          "description": "User's chosen interface language code."
+        },
+        "hasProfile": {
+          "type": "boolean",
+          "description": "True when the user has completed onboarding."
+        },
+        "profile": {
+          "type": "object",
+          "description": "Onboarding profile object with situation, citizenship, accommodation, and completed list."
+        },
+        "progress": {
+          "type": "object",
+          "description": "Map of procedure IDs to status (not-started, in-progress, completed)."
+        },
+        "docs": {
+          "type": "object",
+          "description": "Map of procedure IDs to arrays of checked document names."
+        },
+        "dates": {
+          "type": "object",
+          "description": "Plan dates object containing arrival and expiry ISO date strings."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest sync."
+        }
+      },
+      "required": [
+        "ownerId",
+        "language",
+        "hasProfile",
+        "progress",
+        "docs",
+        "dates",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Private single-owner workspace document storing welcomeRo onboarding answers, checklist progress, document readiness, and timeline dates without PII."
+    }
+  }
+}

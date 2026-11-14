@@ -1,14 +1,31 @@
-// App-wide state: language, profile, progress. Everything is saved to localStorage when it changes.
-// To add accounts/a database later, replace the reads/writes in this file (and lib/storage.ts); pages stay the same.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+// App-wide state: language, profile, progress, docs, dates, and optional Google/Firestore sync.
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { procedures } from '../data';
 import { DEFAULT_LANG, directionOf, isLang } from '../i18n';
 import { buildChecklist, sanitizeProgress, summarize, type ProgressSummary } from '../lib/checklist';
 import { sanitizeDocs, toggleDoc as toggleDocIn, type DocsMap } from '../lib/docs';
+import { auth, googleProvider } from '../lib/firebase';
 import { sanitizeDates, type PlanDates } from '../lib/plan';
 import { isProfile } from '../lib/profile';
 import { clearAllData, localData, STORAGE_KEYS } from '../lib/storage';
+import {
+  createUserWorkspace,
+  deleteUserWorkspace,
+  loadUserWorkspace,
+  updateUserWorkspace,
+  type WorkspaceState,
+} from '../lib/userSync';
 import type { ChecklistTask, Lang, Profile, ProgressMap, TaskStatus } from '../types';
+
+export interface AuthUser {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
 interface AppContextValue {
   language: Lang;
@@ -27,6 +44,13 @@ interface AppContextValue {
   tasks: ChecklistTask[];
   summary: ProgressSummary;
   resetAll: () => void;
+  user: AuthUser | null;
+  authReady: boolean;
+  authLoading: boolean;
+  authError: boolean;
+  syncStatus: SyncStatus;
+  signInWithGoogle: () => Promise<void>;
+  signOutUser: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -41,14 +65,36 @@ function loadProfile(): Profile | null {
   return isProfile(stored) ? stored : null;
 }
 
+function writeWorkspaceToLocal(state: WorkspaceState): void {
+  localData.write(STORAGE_KEYS.language, state.language);
+  if (state.profile) {
+    localData.write(STORAGE_KEYS.profile, state.profile);
+  } else {
+    localData.remove(STORAGE_KEYS.profile);
+  }
+  localData.write(STORAGE_KEYS.progress, state.progress);
+  localData.write(STORAGE_KEYS.docs, state.docs);
+  localData.write(STORAGE_KEYS.dates, state.dates);
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Lang>(loadLanguage);
   const [languageChosen, setLanguageChosen] = useState<boolean>(() => isLang(localData.read<unknown>(STORAGE_KEYS.language, null)));
   const [profile, setProfile] = useState<Profile | null>(loadProfile);
   const [progress, setProgress] = useState<ProgressMap>(() => sanitizeProgress(localData.read<unknown>(STORAGE_KEYS.progress, {})));
-
   const [docs, setDocs] = useState<DocsMap>(() => sanitizeDocs(localData.read<unknown>(STORAGE_KEYS.docs, {})));
   const [dates, setDatesState] = useState<PlanDates>(() => sanitizeDates(localData.read<unknown>(STORAGE_KEYS.dates, {})));
+
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+
+  const stateRef = useRef<WorkspaceState>({ language, profile, progress, docs, dates });
+  const activeUidRef = useRef<string | null>(null);
+  const hasRemoteDocRef = useRef(false);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Keep the page's language and reading direction (left-to-right / right-to-left) in sync.
   useEffect(() => {
@@ -56,54 +102,256 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = directionOf(language);
   }, [language]);
 
-  const setLanguage = useCallback((lang: Lang) => {
-    setLanguageState(lang);
-    setLanguageChosen(true);
-    localData.write(STORAGE_KEYS.language, lang);
+  const enqueueWrite = useCallback((uid: string, snapshot: WorkspaceState) => {
+    setSyncStatus('syncing');
+    writeQueueRef.current = writeQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (activeUidRef.current !== uid) return;
+        if (!hasRemoteDocRef.current) {
+          await createUserWorkspace(uid, snapshot);
+          hasRemoteDocRef.current = true;
+        } else {
+          await updateUserWorkspace(uid, snapshot);
+        }
+        if (activeUidRef.current === uid) {
+          setSyncStatus('synced');
+        }
+      })
+      .catch(() => {
+        if (activeUidRef.current === uid) {
+          setSyncStatus('error');
+        }
+      });
   }, []);
 
-  const completeOnboarding = useCallback((next: Profile) => {
-    setProfile(next);
-    localData.write(STORAGE_KEYS.profile, next);
-  }, []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        activeUidRef.current = null;
+        hasRemoteDocRef.current = false;
+        setUser(null);
+        setSyncStatus('idle');
+        setAuthReady(true);
+        return;
+      }
 
-  const setTaskStatus = useCallback((procedureId: string, status: TaskStatus) => {
-    setProgress((current) => {
-      const next = { ...current, [procedureId]: status };
-      localData.write(STORAGE_KEYS.progress, next);
-      return next;
+      const uid = firebaseUser.uid;
+      activeUidRef.current = uid;
+      setUser({
+        uid,
+        displayName: firebaseUser.displayName,
+        email: firebaseUser.email,
+        photoURL: firebaseUser.photoURL,
+      });
+      setAuthReady(true);
+      setAuthError(false);
+      setSyncStatus('syncing');
+
+      try {
+        const loaded = await loadUserWorkspace(uid);
+        if (activeUidRef.current !== uid) return;
+        hasRemoteDocRef.current = loaded.exists;
+
+        const localSnapshot = stateRef.current;
+        if (loaded.exists && (loaded.hasProfile || !localSnapshot.profile)) {
+          stateRef.current = loaded.state;
+          writeWorkspaceToLocal(loaded.state);
+          setLanguageState(loaded.state.language);
+          setLanguageChosen(true);
+          setProfile(loaded.state.profile);
+          setProgress(loaded.state.progress);
+          setDocs(loaded.state.docs);
+          setDatesState(loaded.state.dates);
+          setSyncStatus('synced');
+        } else {
+          enqueueWrite(uid, localSnapshot);
+        }
+      } catch {
+        if (activeUidRef.current === uid) {
+          setSyncStatus('error');
+        }
+      }
     });
-  }, []);
 
-  const toggleDoc = useCallback((procedureId: string, docName: string) => {
-    setDocs((current) => {
-      const next = toggleDocIn(current, procedureId, docName);
-      localData.write(STORAGE_KEYS.docs, next);
-      return next;
-    });
-  }, []);
+    return () => unsubscribe();
+  }, [enqueueWrite]);
 
-  const setDates = useCallback((next: PlanDates) => {
-    setDatesState(next);
-    localData.write(STORAGE_KEYS.dates, next);
-  }, []);
+  const setLanguage = useCallback(
+    (lang: Lang) => {
+      const nextState: WorkspaceState = { ...stateRef.current, language: lang };
+      stateRef.current = nextState;
+      setLanguageState(lang);
+      setLanguageChosen(true);
+      localData.write(STORAGE_KEYS.language, lang);
+      if (activeUidRef.current) enqueueWrite(activeUidRef.current, nextState);
+    },
+    [enqueueWrite],
+  );
+
+  const completeOnboarding = useCallback(
+    (next: Profile) => {
+      const nextState: WorkspaceState = { ...stateRef.current, profile: next };
+      stateRef.current = nextState;
+      setProfile(next);
+      localData.write(STORAGE_KEYS.profile, next);
+      if (activeUidRef.current) enqueueWrite(activeUidRef.current, nextState);
+    },
+    [enqueueWrite],
+  );
+
+  const setTaskStatus = useCallback(
+    (procedureId: string, status: TaskStatus) => {
+      const nextProgress = { ...stateRef.current.progress, [procedureId]: status };
+      const nextState: WorkspaceState = { ...stateRef.current, progress: nextProgress };
+      stateRef.current = nextState;
+      setProgress(nextProgress);
+      localData.write(STORAGE_KEYS.progress, nextProgress);
+      if (activeUidRef.current) enqueueWrite(activeUidRef.current, nextState);
+    },
+    [enqueueWrite],
+  );
+
+  const toggleDoc = useCallback(
+    (procedureId: string, docName: string) => {
+      const nextDocs = toggleDocIn(stateRef.current.docs, procedureId, docName);
+      const nextState: WorkspaceState = { ...stateRef.current, docs: nextDocs };
+      stateRef.current = nextState;
+      setDocs(nextDocs);
+      localData.write(STORAGE_KEYS.docs, nextDocs);
+      if (activeUidRef.current) enqueueWrite(activeUidRef.current, nextState);
+    },
+    [enqueueWrite],
+  );
+
+  const setDates = useCallback(
+    (next: PlanDates) => {
+      const nextState: WorkspaceState = { ...stateRef.current, dates: next };
+      stateRef.current = nextState;
+      setDatesState(next);
+      localData.write(STORAGE_KEYS.dates, next);
+      if (activeUidRef.current) enqueueWrite(activeUidRef.current, nextState);
+    },
+    [enqueueWrite],
+  );
 
   const resetAll = useCallback(() => {
     clearAllData();
+    const emptyState: WorkspaceState = {
+      language: DEFAULT_LANG,
+      profile: null,
+      progress: {},
+      docs: {},
+      dates: { arrival: '', expiry: '' },
+    };
+    stateRef.current = emptyState;
     setProfile(null);
     setProgress({});
     setDocs({});
     setDatesState({ arrival: '', expiry: '' });
     setLanguageState(DEFAULT_LANG);
     setLanguageChosen(false);
+
+    const uid = activeUidRef.current;
+    if (uid) {
+      setSyncStatus('syncing');
+      writeQueueRef.current = writeQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (activeUidRef.current !== uid) return;
+          if (hasRemoteDocRef.current) {
+            await deleteUserWorkspace(uid);
+            hasRemoteDocRef.current = false;
+          }
+          if (activeUidRef.current === uid) {
+            setSyncStatus('idle');
+          }
+        })
+        .catch(() => {
+          if (activeUidRef.current === uid) {
+            setSyncStatus('error');
+          }
+        });
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    setAuthLoading(true);
+    setAuthError(false);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: unknown }).code : undefined;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setAuthError(true);
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  const signOutUser = useCallback(async () => {
+    setAuthLoading(true);
+    setAuthError(false);
+    try {
+      await signOut(auth);
+    } catch {
+      setAuthError(true);
+    } finally {
+      setAuthLoading(false);
+    }
   }, []);
 
   const tasks = useMemo(() => (profile ? buildChecklist(procedures, profile) : []), [profile]);
   const summary = useMemo(() => summarize(tasks, progress), [tasks, progress]);
 
   const value = useMemo<AppContextValue>(
-    () => ({ language, setLanguage, languageChosen, profile, completeOnboarding, progress, setTaskStatus, docs, toggleDoc, dates, setDates, tasks, summary, resetAll }),
-    [language, setLanguage, languageChosen, profile, completeOnboarding, progress, setTaskStatus, docs, toggleDoc, dates, setDates, tasks, summary, resetAll],
+    () => ({
+      language,
+      setLanguage,
+      languageChosen,
+      profile,
+      completeOnboarding,
+      progress,
+      setTaskStatus,
+      docs,
+      toggleDoc,
+      dates,
+      setDates,
+      tasks,
+      summary,
+      resetAll,
+      user,
+      authReady,
+      authLoading,
+      authError,
+      syncStatus,
+      signInWithGoogle,
+      signOutUser,
+    }),
+    [
+      language,
+      setLanguage,
+      languageChosen,
+      profile,
+      completeOnboarding,
+      progress,
+      setTaskStatus,
+      docs,
+      toggleDoc,
+      dates,
+      setDates,
+      tasks,
+      summary,
+      resetAll,
+      user,
+      authReady,
+      authLoading,
+      authError,
+      syncStatus,
+      signInWithGoogle,
+      signOutUser,
+    ],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

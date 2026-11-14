@@ -338,7 +338,7 @@ describe('translations', () => {
       'onb.situation.': SITUATIONS, 'onb.citizenship.': CITIZENSHIPS, 'onb.accommodation.': ACCOMMODATIONS,
       'onb.completed.': COMPLETED_KEYS, 'status.': ['not-started', 'in-progress', 'completed'],
       'level.': ['verified', 'recommended', 'confirm'], 'note.': ['findAccommodationFirst', 'accommodationUnsure', 'needsAccommodation', 'preCompleted', 'addressNotRegistered'],
-      'guide.sourceKind.': ['government', 'university', 'eu'], 'priority.': ['high', 'low'], 'ai.ex.': ['1', '2', '3', '4', '5'],
+      'guide.sourceKind.': ['government', 'university', 'eu', 'ngo'], 'priority.': ['high', 'low'], 'ai.ex.': ['1', '2', '3', '4', '5'],
       'check.filter.': ['all', 'todo', 'progress', 'done'], 'guide.s': ['1', '2', '3', '4', '6', '7', '8', '9', '10'],
     };
     for (const prefix of dynamicPrefixes) {
@@ -470,7 +470,7 @@ describe('AI endpoint (api/chat.ts) with a fake network', () => {
       assert.equal(res.status, 200);
       const b = body as unknown as { system: string; max_tokens: number };
       assert.ok(b.system.includes('Reply with JSON only'));
-      assert.equal(b.max_tokens, 400);
+      assert.equal(b.max_tokens, 200);
     } finally { restore(); }
   });
 });
@@ -680,7 +680,8 @@ describe('AI providers: Gemini and Groq (free tiers) with a fake network', () =>
   const capture = (reply: unknown, status = 200) => {
     const box: { seen: Seen | null } = { seen: null };
     globalThis.fetch = (async (url: string, init: RequestInit) => {
-      box.seen = { url: String(url), headers: init.headers as Record<string, string>, raw: init.body as string, body: JSON.parse(init.body as string) };
+      const headers = Object.fromEntries(new Headers(init.headers).entries());
+      box.seen = { url: String(url), headers, raw: init.body as string, body: JSON.parse(init.body as string) };
       return new Response(JSON.stringify(reply), { status });
     }) as unknown as typeof fetch;
     return box;
@@ -696,26 +697,26 @@ describe('AI providers: Gemini and Groq (free tiers) with a fake network', () =>
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { reply: 'The CNP is a personal code.' });
       const s = box.seen as Seen;
-      assert.equal(s.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+      assert.ok(s.url.includes('/models/gemini-3.1-flash-lite:generateContent'));
       assert.ok(!s.url.includes('g-secret'), 'key must not be in the URL');
       assert.equal(s.headers['x-goog-api-key'], 'g-secret');
       assert.ok(!s.raw.includes('g-secret'), 'key must not be in the body');
       assert.deepEqual(s.body.contents.map((c: any) => c.role), ['user', 'model', 'user']);
       assert.ok(s.body.systemInstruction.parts[0].text.includes('Residence permit for studies'));
-      assert.deepEqual(s.body.generationConfig.thinkingConfig, { thinkingBudget: 0 });
+      assert.deepEqual(s.body.generationConfig.thinkingConfig, { thinkingLevel: 'MINIMAL' });
       assert.ok(s.body.generationConfig.maxOutputTokens > 0);
     } finally { restore(); }
   });
 
-  it('Gemini: ignores "thought" parts, honours AI_MODEL, and skips the thinking switch for other models', async () => {
-    setup({ GEMINI_API_KEY: 'g', AI_MODEL: 'gemini-3.5-flash' });
+  it('Gemini: ignores "thought" parts, honours AI_MODEL, and skips the thinking switch for non-thinking models', async () => {
+    setup({ GEMINI_API_KEY: 'g', AI_MODEL: 'gemini-custom-test' });
     const box = capture({ candidates: [{ content: { parts: [{ text: 'internal reasoning', thought: true }, { text: 'Final answer.' }] } }] });
     try {
       const { POST } = await import('../api/chat');
       const res = await POST(post(goodBody));
       assert.deepEqual(await res.json(), { reply: 'Final answer.' });
       const s = box.seen as Seen;
-      assert.ok(s.url.includes('/models/gemini-3.5-flash:generateContent'));
+      assert.ok(s.url.includes('/models/gemini-custom-test:generateContent'));
       assert.equal(s.body.generationConfig.thinkingConfig, undefined);
     } finally { restore(); }
   });
@@ -748,7 +749,7 @@ describe('AI providers: Gemini and Groq (free tiers) with a fake network', () =>
       assert.equal(s.url, 'https://api.groq.com/openai/v1/chat/completions');
       assert.equal(s.headers.authorization, 'Bearer q-secret');
       assert.ok(!s.raw.includes('q-secret'));
-      assert.equal(s.body.model, 'openai/gpt-oss-120b');
+      assert.equal(s.body.model, 'openai/gpt-oss-20b');
       assert.equal(s.body.messages[0].role, 'system');
       assert.deepEqual(s.body.messages.slice(1).map((m: any) => m.role), ['user', 'assistant', 'user']);
       assert.equal(s.body.reasoning_effort, 'low');

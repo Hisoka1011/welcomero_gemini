@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/useI18n';
 import type { MessageKey } from '../i18n';
 import { LanguagePicker } from '../components/LanguagePicker';
-import { Arrow, btnPrimary, cardClass, Notice, ProgressRing } from '../components/ui';
+import { Arrow, btnPrimary, btnSecondary, cardClass, Notice, ProgressRing } from '../components/ui';
 import { Icon, type IconName } from '../components/Icon';
 import { LogoMark, Wordmark } from '../components/Logo';
 
@@ -24,7 +24,7 @@ const FEATURES: Array<{ title: MessageKey; body: MessageKey; icon: IconName }> =
 ];
 
 export function Landing() {
-  const { profile } = useApp();
+  const { profile, user, authReady, authLoading, authError, signInWithGoogle } = useApp();
   const { t } = useI18n();
   const location = useLocation();
   const justDeleted = (location.state as { deleted?: boolean } | null)?.deleted === true;
@@ -50,7 +50,25 @@ export function Landing() {
             <Link to={ctaTarget} className={`${btnPrimary} px-7 py-3.5 text-lg`}>
               {ctaLabel} <Arrow />
             </Link>
+            {authReady && !user ? (
+              <button
+                type="button"
+                onClick={signInWithGoogle}
+                disabled={authLoading}
+                className={`${btnSecondary} px-6 py-3.5 text-base`}
+              >
+                <Icon name="user" className="size-4" />
+                {authLoading ? t('auth.signingIn') : t('auth.signIn')}
+              </button>
+            ) : null}
           </div>
+          {authError ? (
+            <div className="mt-4 max-w-xl">
+              <Notice role="alert" tone="error">
+                {t('auth.error')}
+              </Notice>
+            </div>
+          ) : null}
           <p className="mt-4 max-w-xl text-sm text-muted">{t('landing.audience')}</p>
         </div>
         <div className="relative" aria-hidden="true">
